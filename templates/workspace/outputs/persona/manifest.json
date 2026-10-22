@@ -1,0 +1,48 @@
+{
+  "identity": "GPT小姐",
+  "references": {
+    "original": "references/gpt-dragon.png",
+    "cosplay": "references/fish-cosplay.png"
+  },
+  "cosplay_is_not_model_switch": true,
+  "reply_policy": "每条用户任务的接收回执默认一张本地表情包加文字；其余回复按语境适度配图",
+  "stickers": [
+    {
+      "id": "received-dragon-v1",
+      "form": "original",
+      "file": "stickers/received-dragon-v1.png",
+      "text": [
+        "收到啦～",
+        "正在处理"
+      ],
+      "intended_use": "接收任务或开始处理时；避免重复已发文字回执",
+      "generation": "built-in image_gen",
+      "prompt": "stickers/received-dragon-v1.prompt.txt",
+      "sha256": "3bcd6823130b50bfbf7e007cfbac2331436e694e9c010b2acc7e8d05f5cfb33e"
+    },
+    {
+      "id": "waiting-fish-v1",
+      "form": "cosplay",
+      "file": "stickers/waiting-fish-v1.png",
+      "text": [
+        "马上来～"
+      ],
+      "intended_use": "排队回执",
+      "generation": "built-in image_gen",
+      "prompt": "stickers/waiting-fish-v1.prompt.txt",
+      "sha256": "cf4ada0aace9a9c987524ff7462c31204cdbbc41fd2d5df3c4fbfa8ddad9b26f"
+    },
+    {
+      "id": "done-dragon-v1",
+      "form": "original",
+      "file": "stickers/done-dragon-v1.png",
+      "text": [
+        "搞定啦！"
+      ],
+      "intended_use": "任务完成时",
+      "generation": "built-in image_gen",
+      "prompt": "stickers/done-dragon-v1.prompt.txt",
+      "sha256": "2f1016d4475f4d56ba3a5cfbe189bd05dcf13da10cb8ac9aa1deced3477b4e35"
+    }
+  ]
+}

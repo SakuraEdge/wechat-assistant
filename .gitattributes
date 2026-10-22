@@ -1,0 +1,5 @@
+# Runtime manifests hash exact bytes, including Windows PowerShell UTF-8 BOMs.
+* -text
+*.png binary
+*.exe binary
+*.zip binary

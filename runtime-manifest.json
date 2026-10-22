@@ -1,0 +1,161 @@
+{
+  "version": "1.0.0",
+  "files": [
+    {
+      "path": "docs/FEATURES.md",
+      "sha256": "f8105ef9abbffedb99df4bf31c275e1869cbaaf67bc460026c38c1e08ce8b83f"
+    },
+    {
+      "path": "docs/OPERATIONS.md",
+      "sha256": "146b44e0122aba4255f6633b6edf827a56ea105ee3e775ddf63dc045fbc8ae93"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/package-lock.json",
+      "sha256": "ed5c60510c3797ae937d38b8c280075b29fbdab4f3fea63c164a37adcabe1d8b"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/package.json",
+      "sha256": "f0ce2a499cd551bda45ba09d641dd090c984575406a419563fabff365297c5f9"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/access-policy.mjs",
+      "sha256": "079efcabcbc8a39603857dfc339986d35bebab251fa8dec47be1fa0e9f3ded93"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/ack-stickers.mjs",
+      "sha256": "31473cb622ddcefacc4c63d460a43cb8bdea02c3448976ea0c88ee30950f0213"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/core.mjs",
+      "sha256": "0169eaea92ef771a1a98c87ffbf2b77cbe8556bb4e9ad7b93f435e7ea649d8d7"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/desktop-connection.mjs",
+      "sha256": "1f6f704b8e681adbcd6f5b6ec8d665bc656537e9a91de00ce4f784b39d606bed"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/fast-chat.mjs",
+      "sha256": "6f36efc8320b5fb66916617774dac8b14e9e24ae65506a82d8648e9460b82047"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/file-delivery.mjs",
+      "sha256": "41e360802c16a6ef8eaab79cf4918ebe86e18715e4e8c9d026a118bbdc14cd51"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/file-transfer.mjs",
+      "sha256": "74e8080b61496fb4e0a94a83cdf2f93e4c59f23bab1b6c3ef918e665953ae5bc"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/manager-commands.mjs",
+      "sha256": "1fd536f859f650000ffcb1a9f5a7614071fb540040b88f91b6395a4ab162a7ed"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/media.mjs",
+      "sha256": "ad31a9c0d6a9474bf3d002ead00b54d41c94eae5a0004b8cda3b34d1060e726a"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/message-routing.mjs",
+      "sha256": "244edc0e43c0e087480e0ea175272661c13364661586362a1bb4c3d9827e7989"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/model-policy.mjs",
+      "sha256": "e81ea431aa5face2eae460d66b4a5cf8284ce26e99d1a2392e8c0402c8802164"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/native-chat.mjs",
+      "sha256": "74eecfeb3f5249635a11974600fb702d259329eb520c41cbb3e5db8d72747734"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/project-bridge.mjs",
+      "sha256": "1fcdb0db742099d0cb3ea5d4d2783807293e7f15ad8262db4b29b029d0d15ee7"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/question-broker.mjs",
+      "sha256": "f280590d2d3f2369095d06792554f7f7c66d3b3207a2ccaa51197db5785a611a"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/secure-store.ps1",
+      "sha256": "44997c43ff57439e271ca43785494f73b4881a83115df1e1e06fb12e3d041651"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/wechat-bot.mjs",
+      "sha256": "30dcb9a745b32c553161e08c17586919c941f0861f51e6989a95a0d0af7fb03d"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/wechat-instance.ps1",
+      "sha256": "031d3af814203fb4fbffe9ed42a10130364c844e3a53c25fbfdf4ae05d06275c"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/wechat-question.mjs",
+      "sha256": "5463c48ec30542e8cdb99d88ded7fa68d346631d117c9b6483effaf745a69923"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/work-progress.mjs",
+      "sha256": "2a0aa23415bd525f29f01a8a63fbbae55bb2234b3bcefc4380ece2c6338cac72"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/SKILL.md",
+      "sha256": "279856ab462179445c8f6a6046d8bd7a8969cd2333ff7c2c436e7336ce7b7b90"
+    },
+    {
+      "path": "runtime/skills/wechat-notify/scripts/primary-bridge.ps1",
+      "sha256": "f9523f3705d988695798b768a65fea17745ab1db8e94c6d1c78b7a24e050226d"
+    },
+    {
+      "path": "runtime/skills/wechat-notify/scripts/wechat-notify.ps1",
+      "sha256": "553c9b50904e73cd5af8a76948a11eb33f6c73b0921272f796826eb52f0a85c3"
+    },
+    {
+      "path": "runtime/skills/wechat-notify/SKILL.md",
+      "sha256": "d865ece954517f8ccc815229873476b8d20977814de460e390e22d9136d84c98"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/ack-config.json",
+      "sha256": "5156c7d5febf35e252fd38a444d4515ed04533b34647cc999839098f5c138655"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/manifest.json",
+      "sha256": "cbc4dd71732531712ff9a2382ebd2eed49880b97b42767d36139c7a741e3884c"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/references/fish-cosplay.png",
+      "sha256": "d23213461b29c1c206142da60e2d64ed57111efbafc5b5f116512b7c1b7d2fa8"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/references/gpt-dragon.png",
+      "sha256": "0abfb5920322c86c117539f8cc9250aac859de3fcdef8d780e9461488fe06a45"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/stickers/done-dragon-v1.png",
+      "sha256": "2f1016d4475f4d56ba3a5cfbe189bd05dcf13da10cb8ac9aa1deced3477b4e35"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/stickers/done-dragon-v1.prompt.txt",
+      "sha256": "63c1ae1bd7564260419685305e28b2bb5e1d8e4e0042a03451280da012278856"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/stickers/received-dragon-v1.png",
+      "sha256": "3bcd6823130b50bfbf7e007cfbac2331436e694e9c010b2acc7e8d05f5cfb33e"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/stickers/received-dragon-v1.prompt.txt",
+      "sha256": "a215d8a16878aa8c8f2981574fae0c4f5152767cf8666f5cc4e063b99b67b6a1"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/stickers/waiting-fish-v1.png",
+      "sha256": "cf4ada0aace9a9c987524ff7462c31204cdbbc41fd2d5df3c4fbfa8ddad9b26f"
+    },
+    {
+      "path": "templates/workspace/outputs/persona/stickers/waiting-fish-v1.prompt.txt",
+      "sha256": "672d71c7c2e9c42866821478c3b69cb2ef5b71c9f883058e51a462f1b507cca9"
+    },
+    {
+      "path": "tests/access-policy.test.mjs",
+      "sha256": "602f955f5ddc11d1aa6b97648987cc7be80c8cc0442437f12b8dac6627d55ca8"
+    },
+    {
+      "path": "tests/model-policy.test.mjs",
+      "sha256": "64d9ef1743eeddf5be70db4d6793a7bdca025c12ef8b4719f8da32d31646fa3d"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "normal": "received-dragon-v1.png",
+  "queued": "waiting-fish-v1.png",
+  "cache_ttl_ms": 1800000
+}

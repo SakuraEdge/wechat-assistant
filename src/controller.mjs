@@ -1,0 +1,136 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {spawn} from 'node:child_process';
+import {randomBytes} from 'node:crypto';
+
+export const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const profile=process.env.LOCALAPPDATA;
+const registry=path.join(profile,'Codex','wechat-dialog-instances');
+const manager=path.join(profile,'Codex','wechat-manager');
+const runtime=path.join(appRoot,'runtime','skills');
+const scripts=path.join(runtime,'wechat-dialog','scripts');
+const bot=path.join(scripts,'wechat-bot.mjs');
+const ps=path.join(scripts,'wechat-instance.ps1');
+export const validName=name=>typeof name==='string'&&/^[a-z][a-z0-9-]{0,47}$/.test(name);
+const alive=pid=>{if(!Number.isInteger(pid)||pid<=0)return false;try{process.kill(pid,0);return true;}catch{return false;}};
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function json(file,fallback=null){try{return JSON.parse((await fs.readFile(file,'utf8')).replace(/^\uFEFF/,''));}catch(error){if(error.code==='ENOENT')return fallback;throw Error('CONFIG_INVALID');}}
+export async function config(name){if(!validName(name))throw Error('INVALID_INSTANCE');const c=await json(path.join(registry,name+'.json'));if(!c||c.name!==name||!path.isAbsolute(c.workspace)||!path.isAbsolute(c.data_directory))throw Error('INSTANCE_NOT_REGISTERED');return c;}
+async function modules(){return import(pathToFileURL(path.join(scripts,'access-policy.mjs')));}
+async function env(){const {SecureStore}=await import(pathToFileURL(path.join(scripts,'core.mjs')));const {desktopEnvironment}=await import(pathToFileURL(path.join(scripts,'desktop-connection.mjs')));return desktopEnvironment(SecureStore,path.join(scripts,'secure-store.ps1'));}
+async function run(exe,args,options={}){
+  return new Promise((resolve,reject)=>{
+    const child=spawn(exe,args,{windowsHide:true,stdio:['ignore','pipe','pipe'],...options});let stdout='';
+    child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{stdout+=chunk;if(stdout.length>2_000_000)child.kill();});child.stderr.resume();
+    child.on('error',()=>reject(Error('CHILD_START_FAILED')));child.on('exit',code=>{
+      let result;for(const line of stdout.split(/\r?\n/)){try{result=JSON.parse(line);}catch{}}
+      if(code!==0||result?.status==='error')reject(Error(result?.code||'COMMAND_FAILED'));else resolve(result||{status:'completed'});
+    });
+  });
+}
+async function manage(action,name,extra=[]){const environment=await env();return run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',ps,'-Action',action,'-Name',name,'-NodePath',process.execPath,...extra],{env:environment});}
+async function invoke(c,args){return run(process.execPath,[bot,...args],{env:{...await env(),CODEX_WECHAT_INSTANCE:c.name,CODEX_WECHAT_DATA_DIR:c.data_directory}});}
+async function current(c){const value=await json(path.join(c.data_directory,'status.json'),{});return {...value,running:!!(value.running&&alive(value.pid))};}
+export function isBusy(status){return status.running&&!!(status.phase==='working'||status.queued>0||status.chat_busy||status.attachment_busy);}
+async function waitFor(c,predicate,timeout=70000){const end=Date.now()+timeout;do{const value=await current(c);if(predicate(value))return value;await delay(500);}while(Date.now()<end);throw Error('SERVICE_TIMEOUT');}
+async function stop(c,{requireIdle=false}={}){
+ const value=await current(c);if(!value.running)return {status:'already_stopped'};if(requireIdle&&isBusy(value))throw Error('INSTANCE_BUSY');
+ if(requireIdle){
+  const id=randomBytes(16).toString('hex');await invoke(c,['stop-idle','--request',id]);const receipt=path.join(c.data_directory,'idle-stop-'+id+'.json');const end=Date.now()+10000;let result;
+  while(Date.now()<end){result=await json(receipt);if(result)break;await delay(200);}if(!result)throw Error('SERVICE_TIMEOUT');await fs.unlink(receipt);if(result.status!=='accepted')throw Error('INSTANCE_BUSY');
+ }else await invoke(c,['stop']);
+ await waitFor(c,s=>!alive(s.pid));return {status:'stopped'};
+}
+async function prepare(c){const s=await current(c);if(s.configured)return;if(s.running)throw Error('INSTANCE_BUSY');await manage('Prepare',c.name);}
+export async function snapshot(){
+  let names;try{names=(await fs.readdir(registry)).filter(name=>/^[a-z][a-z0-9-]{0,47}\.json$/.test(name));}catch(error){if(error.code==='ENOENT')names=[];else throw error;}
+  const labels=await json(path.join(manager,'labels.json'),{});const {loadAccessPolicy}=await modules();
+  const instances=await Promise.all(names.map(async file=>{const name=file.slice(0,-5);try{
+    const c=await config(name),s=await current(c);const policy=await loadAccessPolicy(c.data_directory,name);
+    const {loadModelPolicy}=await import(pathToFileURL(path.join(scripts,'model-policy.mjs')));const selection=await loadModelPolicy(c.data_directory);
+    return {name,label:labels[name]||name,workspace:c.workspace,data_directory:c.data_directory,configured:!!s.configured,logged_in:!!s.logged_in,running:s.running,phase:s.phase||'unprepared',busy:isBusy(s),reply_ready:!!s.reply_ready,thread_id:s.thread_id||null,policy,last_received_at:s.last_received_at||s.last_chat?.at||null,last_work_finished_at:s.last_work_finished_at||null,queued:s.queued||0,updated_at:s.updated_at||null,project_tools_connected:!!s.project_tools_connected,model:selection.model,reasoning_effort:selection.effort,effective_model:s.model||null,effective_effort:s.reasoning_effort??null,account_fingerprint:s.account_fingerprint||null};
+  }catch(error){return {name,label:labels[name]||name,error:error.message,running:false,phase:'needs_attention'};}}));
+  instances.sort((a,b)=>a.name==='primary'?-1:b.name==='primary'?1:a.name.localeCompare(b.name,undefined,{numeric:true}));
+  const next=instances.length?Math.max(1,...instances.map(item=>Number(item.name.match(/^user-(\d+)$/)?.[1]||1)))+1:1;
+  return {status:'ok',version:'1.0.0',notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
+}
+export async function catalog({refresh=false}={}){
+ const file=path.join(manager,'model-catalog.json');const cached=await json(file);
+ if(!refresh&&cached&&Date.now()-Date.parse(cached.retrieved_at)<300000)return cached;
+ const {SecureStore,RpcClient}=await import(pathToFileURL(path.join(scripts,'core.mjs')));
+ const {normalizeCatalog}=await import(pathToFileURL(path.join(scripts,'model-policy.mjs')));
+ const state=await new SecureStore(path.join(profile,'Codex','wechat-dialog'),path.join(scripts,'secure-store.ps1')).load()||{};
+ const environment={...await env(),...(state.providerEnv||{})};const executable=state.codex||environment.CODEX_CLI_PATH;if(!executable)throw Error('CODEX_PATH_REQUIRED');
+ const rpc=new RpcClient(executable,environment);let items=[],cursor;
+ try{await rpc.initialize();for(let page=0;page<20;page++){const result=await rpc.request('model/list',{includeHidden:false,limit:100,...(cursor?{cursor}:{})},45000);items.push(...result.data);if(!result.nextCursor){cursor=null;break;}if(result.nextCursor===cursor)throw Error('MODEL_LIST_INCOMPLETE');cursor=result.nextCursor;}if(cursor)throw Error('MODEL_LIST_INCOMPLETE');}
+ finally{rpc.close();}
+ const models=normalizeCatalog(items);if(!models.length)throw Error('MODEL_LIST_EMPTY');const result={status:'models',source:'codex-model-list',retrieved_at:new Date().toISOString(),models};
+ await fs.mkdir(manager,{recursive:true});const tmp=file+'.'+randomBytes(6).toString('hex')+'.tmp';await fs.writeFile(tmp,JSON.stringify(result,null,2));await fs.rename(tmp,file);return result;
+}
+async function create(input){
+  const list=await snapshot();const name=input.name||list.next_name;if(!validName(name))throw Error('INVALID_INSTANCE');
+  if(list.instances.some(item=>item.name===name))throw Error('INSTANCE_ALREADY_EXISTS');
+  const label=String(input.label||name).trim();if(!label||label.length>60)throw Error('INVALID_LABEL');
+  const workspace=path.join(profile,'Codex','wechat-workspaces',name);const template=path.join(appRoot,'templates','workspace');
+  if(name==='primary'){
+    try{await fs.access(workspace);throw Error('EXISTING_WORKSPACE_NOT_MANAGED');}catch(error){if(error.code!=='ENOENT')throw error;}
+    await fs.cp(template,workspace,{recursive:true});await manage('Register',name,['-Workspace',workspace]);
+  }else await manage('Create',name,['-Workspace',workspace,'-TemplateWorkspace',template]);
+  await fs.mkdir(path.join(workspace,'docs'),{recursive:true});for(const file of ['FEATURES.md','OPERATIONS.md'])await fs.copyFile(path.join(appRoot,'docs',file),path.join(workspace,'docs',file));
+  const labels=await json(path.join(manager,'labels.json'),{});labels[name]=label;await fs.mkdir(manager,{recursive:true});await fs.writeFile(path.join(manager,'labels.json'),JSON.stringify(labels,null,2));
+  const c=await config(name);await prepare(c);return {status:'created',name,workspace};
+}
+export async function execute(input){
+  if(!input||typeof input!=='object')throw Error('INVALID_REQUEST');
+  if(input.action==='snapshot')return snapshot();
+  if(input.action==='models')return catalog({refresh:true});
+  if(input.action==='create')return create(input);
+  const c=await config(input.name);
+  if(input.action==='start'){await prepare(c);const value=await invoke(c,['start']);await waitFor(c,s=>s.running);return value;}
+  if(input.action==='stop')return stop(c);
+  if(input.action==='restart'){await stop(c,{requireIdle:true});await invoke(c,['start']);await waitFor(c,s=>s.running);return {status:'restarted'};}
+  if(input.action==='connect'){
+    await prepare(c);const s=await current(c);if(s.logged_in&&s.phase!=='needs_attention')return invoke(c,['start']);
+    const directory=path.join(manager,'qr');await fs.mkdir(directory,{recursive:true});const qr=path.join(directory,c.name+'.png');
+    try{await fs.unlink(qr);}catch(error){if(error.code!=='ENOENT')throw error;}
+    try{const result=await invoke(c,['login','--qr',qr]);if(result.status!=='logged_in')return result;return invoke(c,['start']);}
+    finally{try{await fs.unlink(qr);}catch{}}
+  }
+  if(input.action==='permissions'){
+    if(!['owner','standard','delegate'].includes(input.role))throw Error('INVALID_ACCESS_ROLE');
+    const s=await current(c);if(isBusy(s))throw Error('INSTANCE_BUSY');
+    const {saveAccessPolicy}=await modules();const policyInput={role:input.role,capabilities:input.capabilities||{}};
+    // Validate before stopping a working listener; policy file changes are local-owner operations.
+    if(c.name==='primary'&&(input.role!=='owner'||Object.values(policyInput.capabilities).includes(false)))throw Error('PRIMARY_OWNER_REQUIRED');
+    if(c.name!=='primary'&&input.role==='owner')throw Error('PRIMARY_OWNER_REQUIRED');
+    for(const [key,value]of Object.entries(policyInput.capabilities))if(!['images','files','projects'].includes(key)||typeof value!=='boolean')throw Error('INVALID_CAPABILITY');
+    await stop(c,{requireIdle:true});const policy=await saveAccessPolicy(c.data_directory,c.name,policyInput);
+    if(s.running){await invoke(c,['start']);await waitFor(c,value=>value.running);}
+    return {status:'permissions_saved',policy,restarted:s.running};
+  }
+  if(input.action==='model'){
+    const s=await current(c);if(isBusy(s))throw Error('INSTANCE_BUSY');
+    const available=await catalog({refresh:true});const {validateSelection,saveModelPolicy}=await import(pathToFileURL(path.join(scripts,'model-policy.mjs')));
+    const selection=validateSelection(input,available.models);await stop(c,{requireIdle:true});await saveModelPolicy(c.data_directory,selection,available.models);
+    if(s.running){await invoke(c,['start']);await waitFor(c,value=>value.running);}
+    return {status:'model_saved',selection,restarted:s.running};
+  }
+  if(input.action==='open-chat'){
+    const s=await current(c);if(!s.thread_id)throw Error('CHAT_NOT_READY');const primary=await config('primary');
+    const queued=await invoke(primary,['desktop-action','--action','open-chat','--thread',s.thread_id]);
+    const receipt=path.join(primary.data_directory,'desktop-commands',queued.request_id+'.receipt.json');const end=Date.now()+40000;
+    while(Date.now()<end){const result=await json(receipt);if(result?.status==='submitted')return {status:'opened'};if(result?.status==='failed')throw Error(result.error||'DESKTOP_CONNECTION_UNAVAILABLE');await delay(400);}throw Error('DESKTOP_ACTION_UNCONFIRMED');
+  }
+  if(input.action==='open-workspace'){spawn('explorer.exe',[c.workspace],{windowsHide:true,detached:true,stdio:'ignore'}).unref();return {status:'opened'};}
+  throw Error('UNKNOWN_ACTION');
+}
+async function main(){
+  try{
+    if(process.platform!=='win32')throw Error('WINDOWS_REQUIRED');
+    let input={action:'snapshot'};const index=process.argv.indexOf('--request');
+    if(index>=0){const file=path.resolve(process.argv[index+1]||'');const jobRoot=path.join(manager,'jobs')+path.sep;if(!file.startsWith(jobRoot)||!/^[a-f0-9]{32}\.json$/.test(path.basename(file)))throw Error('INVALID_REQUEST_FILE');input=await json(file);await fs.unlink(file);}
+    console.log(JSON.stringify(await execute(input)));
+  }catch(error){console.log(JSON.stringify({status:'error',code:/^[A-Z][A-Z0-9_]+$/.test(error.message)?error.message:'MANAGER_LOCAL_ERROR'}));process.exitCode=1;}
+}
+if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();
