@@ -2,6 +2,27 @@
  $dialog=[Windows.Markup.XamlReader]::Load([Xml.XmlNodeReader]::new([xml]$source));if($script:window.IsLoaded){$dialog.Owner=$script:window}
  if($script:window.Icon){$dialog.Icon=$script:window.Icon};return $dialog
 }
+function New-SetupDialog {
+ return Read-Dialog @'
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="首次使用 / 连接客户端" Width="720" Height="650" MinHeight="590" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F4F6FB"><Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel><TextBlock Text="连接你的 Codex 与微信" FontSize="23" FontWeight="SemiBold" Foreground="#26324A"/><TextBlock Text="1 安装已完成：程序与运行环境由安装包自动部署。&#10;2 登录 Codex，将下方连接提示发到 Codex 对话，等待初始化完成。&#10;3 回到本窗口重新检测，然后新增微信用户并由本人扫码。" TextWrapping="Wrap" LineHeight="25" Margin="0,14,0,12"/></StackPanel><TextBlock Name="SetupStatus" Grid.Row="1" Text="正在检测连接配置…" Foreground="#6454D9" Margin="0,0,0,12" TextWrapping="Wrap"/><TextBox Name="Prompt" Grid.Row="2" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="14"/><StackPanel Grid.Row="3" Margin="0,14,0,0"><TextBlock Text="本人登录与扫码需要用户完成；软件不附带账号或额度。连接信息由当前客户端提供，不能从其他电脑复制。" TextWrapping="Wrap" Foreground="#69758C" Margin="0,0,0,12"/><WrapPanel><Button Name="CopyPrompt" Content="复制连接提示" Padding="14,9" Margin="0,0,10,0"/><Button Name="CheckConnection" Content="重新检测连接" Padding="14,9" Margin="0,0,10,0"/><Button Name="CloseGuide" Content="返回管理器" Padding="14,9"/></WrapPanel></StackPanel></Grid></Window>
+'@
+}
+function Update-SetupDialog {
+ if(-not $script:setupDialog -or -not $script:setupDialog.IsVisible -or -not $script:setupState){return}
+ $dialog=$script:setupDialog;$state=$script:setupState;$dialog.FindName('Prompt').Text=$state.prompt
+ $runtime=if($state.bundled_node){'内置运行环境已就绪'}else{'Node '+$state.node_version+' 已就绪'}
+ $dialog.FindName('SetupStatus').Text=$runtime+' · '+$(if($state.ready){'客户端连接配置已就绪，可返回管理器读取模型校验。'}else{'尚未完成客户端连接，请发送下方提示到已登录的Codex。'})
+}
+function Show-Setup {
+ if($script:setupDialog -and $script:setupDialog.IsVisible){[void]$script:setupDialog.Activate();return}
+ $script:setupShown=$true;$dialog=New-SetupDialog;$script:setupDialog=$dialog
+ $dialog.FindName('CopyPrompt').Add_Click({$dlg=[Windows.Window]::GetWindow($this);$text=$dlg.FindName('Prompt').Text;if($text){[Windows.Clipboard]::SetText($text);$dlg.FindName('SetupStatus').Text='连接提示已复制，请粘贴到Codex对话并发送。'}})
+ $dialog.FindName('CheckConnection').Add_Click({[void](Begin-JobCommand @{action='setup-status';name=''})})
+ $dialog.FindName('CloseGuide').Add_Click({[Windows.Window]::GetWindow($this).Close()})
+ $dialog.Add_ContentRendered({Update-SetupDialog})
+ [void](Begin-JobCommand @{action='setup-status';name=''})
+ [void]$dialog.ShowDialog();$script:setupDialog=$null
+}
 function New-PersonaDialog {
  return Read-Dialog @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="人设与名称" Width="720" Height="790" MinWidth="620" MinHeight="680" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F4F6FB">

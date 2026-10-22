@@ -1,0 +1,14 @@
+{
+  "node": {
+    "version": "24.16.0",
+    "architecture": "x64",
+    "url": "https://nodejs.org/dist/v24.16.0/win-x64/node.exe",
+    "sha256": "b3094d0b49f9ad602262a9921551737bb97637c05dd357a06ae98188d7290aa3",
+    "license_url": "https://raw.githubusercontent.com/nodejs/node/v24.16.0/LICENSE"
+  },
+  "compiler": {
+    "version": "6.7.3",
+    "url": "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe",
+    "sha256": "9c73c3bae7ed48d44112a0f48e66742c00090bdb5bef71d9d3c056c66e97b732"
+  }
+}

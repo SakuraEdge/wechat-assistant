@@ -1,9 +1,9 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "files": [
     {
       "path": "docs/FEATURES.md",
-      "sha256": "0ec96f70a9505fa7a66bd76113f66208673cdd87ec0a1927bb4db0628d9caa04"
+      "sha256": "5ffe7e1e454b80f63b88ba58a0e4fce74ef92c1550b194a5984a2a3d7365fb13"
     },
     {
       "path": "docs/OPERATIONS.md",
@@ -91,7 +91,7 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-instance.ps1",
-      "sha256": "031d3af814203fb4fbffe9ed42a10130364c844e3a53c25fbfdf4ae05d06275c"
+      "sha256": "0f50a76c3edb152898391ffcd4797fc90c100f4ec7c83d69a1a628f74ba65105"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-question.mjs",
@@ -107,11 +107,11 @@
     },
     {
       "path": "runtime/skills/wechat-notify/scripts/primary-bridge.ps1",
-      "sha256": "f9523f3705d988695798b768a65fea17745ab1db8e94c6d1c78b7a24e050226d"
+      "sha256": "c3cb540ec48a94fab9815254c0642ec478a885302f2a416bed0206c90b349ccd"
     },
     {
       "path": "runtime/skills/wechat-notify/scripts/wechat-notify.ps1",
-      "sha256": "553c9b50904e73cd5af8a76948a11eb33f6c73b0921272f796826eb52f0a85c3"
+      "sha256": "b4e219f2f4bfe957ededdc462f796b59cfb5d4a5cdc78c24e6f7e5ea1c3090c5"
     },
     {
       "path": "runtime/skills/wechat-notify/SKILL.md",

@@ -21,9 +21,13 @@
 | 管理器内聊天 | 所选实例独立只读窗口，每4秒刷新，最多300条近期收发；旧版仅有摘要时明确标注。附件只显示名称；不导出工具/推理/认证 | conversation-log.mjs、Dialogs.ps1；记录随现有DPAPI状态保存 |
 | 人设与命名 | 每实例独立persona/profile.json与按内容哈希保存的私人图片；默认GPT小姐两形象，可改助手自称和列表备注；不改变模型/角色权限 | persona-profile.mjs；校验格式、大小、数量、真实路径及目录链接 |
 | 程序名称与图标 | ClawBot实例管理器窗口、EXE版本描述和图标统一；旧启动器转新EXE，Node后台进程仍显示运行时名称 | Launcher.cs、LegacyLauncher.cs、assets/clawbot.ico |
+| Windows安装器 | 当前用户无管理员安装、桌面/开始菜单/卸载项、固定Node与扫码依赖；首次向导引导本人Codex连接和微信扫码；运行中拒绝覆盖，不复制账号或改PATH | installer/、tools/build-release.mjs；发布资产附SHA-256与安装清单 |
+| 安装完整性与卸载 | 安装后逐文件核对哈希；安装/卸载检查目标目录进程，不强杀；卸载保留用户目录认证/队列/设置/聊天/工作文件 | SetupGuard.cs、verify-payload.mjs、installer测试；同机隔离安装目录验收，不声称已在另一电脑测试 |
 | 迁移与依赖 | 新电脑需Windows、Node24+、已登录运行的Codex；旧机器DPAPI不迁移，微信重新扫码；首用在客户端初始化连接，后续本机可双击 | initialize.ps1、docs/MIGRATION.md；不含模型，不绕过客户端 |
 
 ## 版本与验证
+
+- 2026-10-22 · v1.2.0：新增6项安装相关测试，覆盖文件篡改、清单路径/链接逃逸、首次连接状态与无全局Node的内置运行环境选择。安装、启动、保护和卸载使用本机隔离目录验收，发布结果以README和Release为准。
 
 - 2026-10-22 · v1.1.0：81项主回归、24项独立包测试通过；三类WPF窗口加载与新EXE版本信息通过。人设、模型、聊天记录隔离，参考图路径和格式拒绝测试通过；具体真机验收见软件包docs/VERIFICATION.md。
 

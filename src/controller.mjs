@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
+import {setupStatus} from './setup-status.mjs';
 
 export const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const profile=process.env.LOCALAPPDATA;
@@ -57,7 +58,7 @@ export async function snapshot(){
   }catch(error){return {name,label:labels[name]||name,error:error.message,running:false,phase:'needs_attention'};}}));
   instances.sort((a,b)=>a.name==='primary'?-1:b.name==='primary'?1:a.name.localeCompare(b.name,undefined,{numeric:true}));
   const next=instances.length?Math.max(1,...instances.map(item=>Number(item.name.match(/^user-(\d+)$/)?.[1]||1)))+1:1;
-  return {status:'ok',version:'1.1.0',default_persona,notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
+  return {status:'ok',version:'1.2.0',default_persona,notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
 }
 export async function catalog({refresh=false}={}){
  const file=path.join(manager,'model-catalog.json');const cached=await json(file);
@@ -88,8 +89,9 @@ async function create(input){
 export async function execute(input){
   if(!input||typeof input!=='object')throw Error('INVALID_REQUEST');
   if(input.action==='snapshot')return snapshot();
+  if(input.action==='setup-status')return setupStatus(appRoot,await env());
   if(input.action==='models')return catalog({refresh:true});
-  if(input.action==='create')return create(input);
+  if(input.action==='create'){if(!(await setupStatus(appRoot,await env())).ready)throw Error('CLIENT_CONNECTION_REQUIRED');return create(input);}
   const c=await config(input.name);
   if(input.action==='history'){
     const {SecureStore}=await import(pathToFileURL(path.join(scripts,'core.mjs')));
@@ -111,10 +113,11 @@ export async function execute(input){
     finally{if(s.running){await invoke(c,['start']);await waitFor(c,value=>value.running);}}
     return {status:'persona_saved',name:c.name,restarted:s.running};
   }
-  if(input.action==='start'){await prepare(c);const value=await invoke(c,['start']);await waitFor(c,s=>s.running);return value;}
+  if(input.action==='start'){if(!(await setupStatus(appRoot,await env())).ready)throw Error('CLIENT_CONNECTION_REQUIRED');await prepare(c);const value=await invoke(c,['start']);await waitFor(c,s=>s.running);return value;}
   if(input.action==='stop')return stop(c);
   if(input.action==='restart'){await stop(c,{requireIdle:true});await invoke(c,['start']);await waitFor(c,s=>s.running);return {status:'restarted'};}
   if(input.action==='connect'){
+    if(!(await setupStatus(appRoot,await env())).ready)throw Error('CLIENT_CONNECTION_REQUIRED');
     await prepare(c);const s=await current(c);if(s.logged_in&&s.phase!=='needs_attention')return invoke(c,['start']);
     const directory=path.join(manager,'qr');await fs.mkdir(directory,{recursive:true});const qr=path.join(directory,c.name+'.png');
     try{await fs.unlink(qr);}catch(error){if(error.code!=='ENOENT')throw error;}

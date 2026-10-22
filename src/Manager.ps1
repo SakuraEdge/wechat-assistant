@@ -4,13 +4,16 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName PresentationFramework,PresentationCore,WindowsBase
 $script:appRoot=Split-Path $PSScriptRoot -Parent
 $script:controller=Join-Path $PSScriptRoot 'controller.mjs'
-$script:node=if(Test-Path -LiteralPath 'C:\Program Files\nodejs\node.exe'){'C:\Program Files\nodejs\node.exe'}else{(Get-Command node.exe -ErrorAction Stop).Source}
+. (Join-Path $PSScriptRoot 'Runtime.ps1')
+$script:node=Resolve-ManagerNode $script:appRoot
 $script:manager=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Codex\wechat-manager'
 $script:jobsDir=Join-Path $script:manager 'jobs'
 [void][IO.Directory]::CreateDirectory($script:jobsDir)
 $script:jobs=[Collections.ArrayList]::new()
+$script:setupRequested=$false;$script:setupShown=$false;$script:setupState=$null;$script:setupDialog=$null
 $script:rows=@();$script:selection='';$script:lastRefresh=[datetime]::MinValue;$script:catalog=@();$script:modelsRequested=$false;$script:bindingModel=$false
 $script:errors=@{
+ CLIENT_CONNECTION_REQUIRED='请先点击“首次使用 / 连接客户端”，在已登录的Codex中完成连接初始化。'
  INSTANCE_BUSY='该实例有工作、附件或聊天正在处理，请稍后再保存权限或重启。'
  WECHAT_LOGIN_REQUIRED='尚未绑定微信，请点“扫码连接”。'
  CODEX_NOT_FOUND='未找到 Codex 运行程序，请在 Codex 客户端中运行本包的 initialize.ps1。'
@@ -46,7 +49,7 @@ $script:errors=@{
  <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Grid Margin="0,0,0,20"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <StackPanel><TextBlock Text="ClawBot实例管理器" FontSize="28" FontWeight="SemiBold" Foreground="#24304A"/><TextBlock Text="每个账号独立连接 · 主用户统一管理" Foreground="#69758C" Margin="0,7,0,0"/></StackPanel>
-   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button Name="Refresh" Content="刷新状态"/><Button Name="Add" Content="＋ 新增微信用户" Background="#6454D9" Foreground="White" BorderBrush="#6454D9"/></StackPanel>
+   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button Name="Setup" Content="首次使用 / 连接客户端"/><Button Name="Refresh" Content="刷新状态"/><Button Name="Add" Content="＋ 新增微信用户" Background="#6454D9" Foreground="White" BorderBrush="#6454D9"/></StackPanel>
   </Grid>
   <Border Grid.Row="1" Background="#E9E6FD" CornerRadius="10" Padding="16,12" Margin="0,0,0,14"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Name="Summary" Text="正在读取实例状态…" Foreground="#493A9E"/><TextBlock Grid.Column="1" Text="模型与强度按实例设置　|　完成通知 → primary" Foreground="#655A9C"/></Grid></Border>
   <DataGrid Name="Instances" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" SelectionUnit="FullRow" GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeight="48" Background="White" BorderBrush="#E0E5EF" AlternatingRowBackground="#FAFBFE" HorizontalScrollBarVisibility="Auto">
@@ -88,16 +91,16 @@ $script:window.MinHeight=[Math]::Min(740,[Windows.SystemParameters]::WorkArea.He
 $script:window.Height=[Math]::Min(850,[Windows.SystemParameters]::WorkArea.Height-20)
 $script:window.MinWidth=[Math]::Min(1100,[Windows.SystemParameters]::WorkArea.Width-30)
 $script:window.Width=[Math]::Min(1280,[Windows.SystemParameters]::WorkArea.Width-20)
-$script:ui=@{};foreach($name in @('Refresh','Add','Summary','Instances','Detail','Workspace','Chat','Connect','Start','Stop','Restart','OpenChat','OpenFolder','Role','Images','Files','Projects','Save','Message','Model','Effort','RefreshModels','SaveModel','ModelInfo','Persona','PersonaInfo','OpenCodex')){$script:ui[$name]=$script:window.FindName($name)}
+$script:ui=@{};foreach($name in @('Refresh','Add','Summary','Instances','Detail','Workspace','Chat','Connect','Start','Stop','Restart','OpenChat','OpenFolder','Role','Images','Files','Projects','Save','Message','Model','Effort','RefreshModels','SaveModel','ModelInfo','Persona','PersonaInfo','OpenCodex','Setup')){$script:ui[$name]=$script:window.FindName($name)}
 $iconPath=Join-Path $script:appRoot 'assets\clawbot.ico'
 if(Test-Path -LiteralPath $iconPath){$script:window.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$iconPath)}
 . (Join-Path $PSScriptRoot 'Dialogs.ps1')
 function Say([string]$text,[bool]$failed=$false){$script:ui.Message.Text=$text;$script:ui.Message.Foreground=if($failed){'#B54559'}else{'#58677E'}}
 function Selected {if($script:ui.Instances.SelectedItem){return $script:ui.Instances.SelectedItem.Raw};return $null}
 function Begin-JobCommand($request){
- $readOnly=$request.action -in @('snapshot','history','models')
+ $readOnly=$request.action -in @('snapshot','history','models','setup-status')
  if($readOnly -and @($script:jobs|Where-Object {$_.Name -eq $request.name -and $_.Action -eq $request.action}).Count){return $false}
- if(-not $readOnly -and @($script:jobs|Where-Object {$_.Name -eq $request.name -and $_.Action -notin @('snapshot','history','models')}).Count){Say '此实例的上一项操作仍在进行，请等待完成。';return $false}
+ if(-not $readOnly -and @($script:jobs|Where-Object {$_.Name -eq $request.name -and $_.Action -notin @('snapshot','history','models','setup-status')}).Count){Say '此实例的上一项操作仍在进行，请等待完成。';return $false}
  $file=Join-Path $script:jobsDir (([Guid]::NewGuid().ToString('N'))+'.json')
  [IO.File]::WriteAllText($file,($request|ConvertTo-Json -Depth 10 -Compress),[Text.UTF8Encoding]::new($false))
  $start=[Diagnostics.ProcessStartInfo]::new();$start.FileName=$script:node
@@ -182,6 +185,7 @@ function Apply-Snapshot($value){
  $script:nextName=$value.next_name;Update-Selection
 }
 function Add-User {
+ if(-not $script:setupState.ready){Show-Setup;return}
  [xml]$newXaml=@'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="新增独立微信用户" Width="430" Height="285" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="White"><StackPanel Margin="24"><TextBlock Name="Name" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="显示名称" Margin="0,16,0,7"/><TextBox Name="Label" Padding="9" MaxLength="60"/><TextBlock Text="独立登录、独立工作目录；默认开放聊天、生图、文件与跨项目协作。" TextWrapping="Wrap" Foreground="#788599" Margin="0,12,0,15"/><Button Name="Create" Content="创建并扫码连接" Padding="10,8" HorizontalAlignment="Right"/></StackPanel></Window>
 '@
@@ -196,10 +200,11 @@ $script:ui.Instances.Add_SelectionChanged({Update-Selection})
 $script:ui.Role.Add_SelectionChanged({Enable-Capabilities})
 $script:ui.Refresh.Add_Click({$script:lastRefresh=[datetime]::MinValue})
 $script:ui.Add.Add_Click({Add-User})
+$script:ui.Setup.Add_Click({Show-Setup})
 $script:ui.Persona.Add_Click({Show-Persona})
 $script:ui.OpenChat.Add_Click({Show-Chat})
 $script:ui.Model.Add_SelectionChanged({if(-not $script:bindingModel){Update-Efforts $script:ui.Effort.SelectedItem}})
-$script:ui.RefreshModels.Add_Click({Begin-JobCommand @{action='models';name=''}})
+$script:ui.RefreshModels.Add_Click({if(-not $script:setupState.ready){Show-Setup;return};[void](Begin-JobCommand @{action='models';name=''})})
 $script:ui.SaveModel.Add_Click({$row=Selected;$model=$script:ui.Model.SelectedItem;if($row -and $model){Begin-JobCommand @{action='model';name=$row.name;model=$model.model;effort=$script:ui.Effort.SelectedItem}}})
 foreach($pair in @(@('Start','start'),@('Stop','stop'),@('Restart','restart'),@('Connect','connect'),@('OpenCodex','open-chat'),@('OpenFolder','open-workspace'))){$script:ui[$pair[0]].Tag=$pair[1];$script:ui[$pair[0]].Add_Click({$row=Selected;if($row){Begin-JobCommand @{action=$this.Tag;name=$row.name}}})}
 $script:ui.Save.Add_Click({$row=Selected;if($row){Begin-JobCommand @{action='permissions';name=$row.name;role=$script:ui.Role.SelectedItem.Tag;capabilities=@{images=[bool]$script:ui.Images.IsChecked;files=[bool]$script:ui.Files.IsChecked;projects=[bool]$script:ui.Projects.IsChecked}}}})
@@ -217,6 +222,7 @@ $script:timer.Add_Tick({
     $code=if($result.code){$result.code}else{'LOCAL_OPERATION_FAILED'};$detail=if($script:errors.ContainsKey($code)){$script:errors[$code]}else{'操作未完成：'+$code}
     if($job.Action -eq 'history' -and $script:chatWindows.ContainsKey($job.Name)){$script:chatWindows[$job.Name].Window.FindName('Hint').Text=$detail}else{Say $detail $true}
    }elseif($job.Action -eq 'snapshot'){Apply-Snapshot $result
+   }elseif($job.Action -eq 'setup-status'){$script:setupState=$result;Update-SetupDialog;if(-not $result.ready -and -not $script:setupShown){Show-Setup}
    }elseif($job.Action -eq 'history'){Apply-History $result
    }elseif($job.Action -eq 'models'){$script:catalog=@($result.models);Load-ModelChoice (Selected);Say ('已从客户端读取 '+$script:catalog.Count+' 个可用模型及各自推理强度。')
    }else{
@@ -229,9 +235,10 @@ $script:timer.Add_Tick({
   }
   if(([datetime]::UtcNow-$script:lastRefresh).TotalSeconds -ge 4 -and -not @($script:jobs|Where-Object {$_.Action -eq 'snapshot'}).Count){$script:lastRefresh=[datetime]::UtcNow;Begin-JobCommand @{action='snapshot';name=''}}
   foreach($name in @($script:chatWindows.Keys)){$entry=$script:chatWindows[$name];if(([datetime]::UtcNow-$entry.LastRefresh).TotalSeconds -ge 4){$entry.LastRefresh=[datetime]::UtcNow;[void](Begin-JobCommand @{action='history';name=$name})}}
-  if(-not $script:modelsRequested){$script:modelsRequested=$true;Begin-JobCommand @{action='models';name=''}}
+  if(-not $script:setupRequested){$script:setupRequested=$true;[void](Begin-JobCommand @{action='setup-status';name=''})}
+  if($script:setupState.ready -and -not $script:modelsRequested){$script:modelsRequested=$true;Begin-JobCommand @{action='models';name=''}}
  }catch{Say '界面更新异常，请刷新；服务进程保持原状态。' $true}
 })
 $script:window.Add_Closed({$script:timer.Stop()})
-if($SelfTest){$a=New-PersonaDialog;$b=New-ChatDialog;$a.Close();$b.Close();[Console]::WriteLine('WPF_LOAD_OK: manager, persona, chat');exit 0}
+if($SelfTest){$a=New-PersonaDialog;$b=New-ChatDialog;$c=New-SetupDialog;$a.Close();$b.Close();$c.Close();[Console]::WriteLine('WPF_LOAD_OK: manager, persona, chat, setup');exit 0}
 $script:timer.Start();[void]$script:window.ShowDialog()

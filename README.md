@@ -8,16 +8,30 @@
 
 | 平台 | 当前状态 | 获取方式 |
 | --- | --- | --- |
-| Windows 10 / 11 | 已实现并在 Windows 验证 | 下载源码后初始化，构建桌面管理器 |
+| Windows 10 / 11 x64 | 已提供 EXE 安装包与内置运行环境便携包 | [下载最新 Release](https://github.com/SakuraEdge/wechat-assistant/releases/latest) |
 | macOS / Linux | 计划中，当前不能运行此 Windows 界面 | 后续按实际适配进展更新本页 |
 
-源码仓库：[SakuraEdge/wechat-assistant](https://github.com/SakuraEdge/wechat-assistant)。首次公开版本提供源码，尚无 GitHub Release 安装包；可在仓库点击 **Code → Download ZIP**，或运行：
+推荐下载 [v1.2.0 Windows 安装包](https://github.com/SakuraEdge/wechat-assistant/releases/download/v1.2.0/ClawBot-Instance-Manager-Setup-1.2.0-windows-x64.exe)，双击按向导安装。安装包内置经过SHA-256核对的Node.js 24.16.0及扫码依赖，无需手动安装Node/npm、运行命令或编译。
+
+[Release 下载页](https://github.com/SakuraEdge/wechat-assistant/releases/latest)同时提供便携ZIP、文件清单和SHA256SUMS.txt。当前安装包未添加发布者代码签名，可核对Release中的SHA-256；软件不附带Codex账号或模型额度。
+
+需要源码时，可在[源码仓库](https://github.com/SakuraEdge/wechat-assistant)点击 **Code → Download ZIP**，或运行：
 
 ```powershell
 git clone https://github.com/SakuraEdge/wechat-assistant.git
 ```
 
-## 首次使用
+## 安装包首次使用（推荐）
+
+1. 下载并双击 **ClawBot-Instance-Manager-Setup-1.2.0-windows-x64.exe**，按向导点击安装。默认安装到当前用户的`%LOCALAPPDATA%\Programs\ClawBotInstanceManager`，无需管理员权限，不修改系统PATH。
+2. 安装完成打开管理器。首次连接向导会检测运行环境及客户端连接；在自己已登录的Codex对话中发送 **复制连接提示** 的内容，由当前客户端完成初始化。回到管理器点击 **重新检测连接**。
+3. 点击 **新增微信用户**，本人微信扫码确认绑定；第一位为`primary`主用户，后续每人独立扫码。发送“你好”核对回复后即可安排工作。
+
+安装器自动部署软件、运行时和依赖，创建桌面/开始菜单入口及卸载项；登录、客户端授权连接和扫码由本人完成。不要把未登录、未扫码描述为自动绑定成功。没有连接时，新增/启动/扫码会明确要求先完成连接，不会凭空创建其他人的身份。
+
+便携ZIP用户解压到独立文件夹后双击 **ClawBot实例管理器.exe**，同样通过向导完成连接和扫码，无需编译。安装与解压本身不需要联网，首次Codex连接、登录和微信使用需要联网。
+
+## 源码首次使用
 
 1. 安装 **Node.js 24 或更高版本**，安装、登录并保持 **Codex 桌面客户端**运行。Windows PowerShell 与 .NET Framework 用于构建界面。
 2. 解压或克隆源码，在 Codex 中打开软件目录。将下面这句话发给助手，让初始化命令继承当前客户端连接：
@@ -80,7 +94,13 @@ git clone https://github.com/SakuraEdge/wechat-assistant.git
 
 图片最多4张、每张20MiB；文件最多4个、单个100MiB是本地上限，微信接口仍可能有限制。语音与群聊尚未接入。普通回复、进展和文件回到发起任务的绑定账号；技能完成通知固定发送主实例 `primary`。
 
-## 更新软件
+## 安装包更新与卸载
+
+- 更新前等待当前任务完成，在旧管理器停止该安装目录的服务并关闭窗口，再运行新版本安装包。检测到该目录的管理进程或Node后台仍运行时，安装器会拒绝覆盖；不会强行中断工作。
+- 在Windows“已安装的应用”卸载 **ClawBot实例管理器**。卸载只移除安装文件、快捷方式及卸载项，保留Windows用户目录中的登录、实例注册、模型/角色、人设、聊天和工作文件。重装同机仍读取已有数据；换电脑需重新连接和扫码。
+- 不要用别人的Windows用户配置目录覆盖自己的账号数据。安装程序不会复制认证、降低平台审批或更换全局提供商。
+
+## 源码更新
 
 1. 等各实例空闲，停止服务并关闭管理窗口。
 2. Git 用户运行 `git pull --ff-only`；下载 ZIP 的用户将新源码放到独立软件目录。不要用他人的 Windows 配置目录覆盖自己的登录数据。
@@ -119,7 +139,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\initialize.ps1
 | runtime/skills/ | 完整运行源码与技能协议 |
 | templates/ | 新工作区规则与软件形象素材 |
 | tests/ | 软件包独立测试 |
-| tools/ | 同步、审计、安装兼容入口和本地打包工具 |
+| installer/ | 安装器脚本、进程保护、完整性检查及依赖版本 |
+| tools/ | 同步、审计、安装兼容入口、部署包构建与Release发布工具 |
 | docs/ | 功能、协议、迁移及验证记录 |
 
 ```powershell
@@ -133,6 +154,8 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File src/Manager.ps1 -Se
 认证、队列、临时二维码和工作数据位于本机 `%LOCALAPPDATA%/Codex/`，不会随仓库上传。构建产物、依赖与本地部署包已忽略；换电脑需重新初始化、扫码，不复制 DPAPI 登录数据。
 
 ## 更新记录
+
+- **2026-10-22 · v1.2.0**：首次提供Windows x64 EXE安装器和内置Node的便携包；自动部署依赖、创建入口与卸载项；新增首次连接向导、安装后文件校验、运行中覆盖保护和保留私人数据的卸载流程。详细构建与发布见[发行说明](docs/RELEASING.md)。
 
 - **2026-10-22 · v1.1.0**：更名ClawBot实例管理器并加入原生程序图标；增加逐实例名称、人设、参考图编辑；实例列表显示独立模型/强度；新增管理器聊天查看窗口与Codex入口；兼容客户端更新后失效的旧CLI路径。
 

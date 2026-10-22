@@ -161,7 +161,7 @@ try {
     switch ($Action) {
         'Status' {
             $bridgeScript = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'wechat-dialog\scripts\wechat-bot.mjs'
-            $bridgeNode = 'C:\Program Files\nodejs\node.exe'
+            $bridgeNode = Resolve-PrimaryWechatNode
             if ((Test-Path -LiteralPath $bridgeScript) -and (Test-Path -LiteralPath $bridgeNode)) {
                 try {
                     $bridgeStatus = Invoke-PrimaryWechatBridge -Node $bridgeNode -Script $bridgeScript -Command status
@@ -208,7 +208,7 @@ try {
         'Send' {
             $message = Read-Message
             $bridgeScript = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'wechat-dialog\scripts\wechat-bot.mjs'
-            $bridgeNode = 'C:\Program Files\nodejs\node.exe'
+            $bridgeNode = Resolve-PrimaryWechatNode
             if ((Test-Path -LiteralPath $bridgeScript) -and (Test-Path -LiteralPath $bridgeNode)) {
                 try {
                     $bridgeResult = Invoke-PrimaryWechatBridge -Node $bridgeNode -Script $bridgeScript -Command send -MessageFile $MessageFile

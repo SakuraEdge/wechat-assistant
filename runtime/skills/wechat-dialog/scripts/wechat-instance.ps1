@@ -24,6 +24,8 @@ $botScript = Join-Path $PSScriptRoot 'wechat-bot.mjs'
 function Write-InstanceResult($Value) { [Console]::Out.WriteLine(($Value | ConvertTo-Json -Depth 10 -Compress)) }
 function Resolve-Node {
     if ($NodePath -and (Test-Path -LiteralPath $NodePath -PathType Leaf)) { return $NodePath }
+    $bundled=Join-Path $PSScriptRoot '..\..\..\node\node.exe'
+    if(Test-Path -LiteralPath $bundled -PathType Leaf){return [IO.Path]::GetFullPath($bundled)}
     $runtimeConfig = Join-Path (Split-Path $PSScriptRoot -Parent) 'runtime-config.json'
     if (Test-Path -LiteralPath $runtimeConfig) {
         $runtime = [IO.File]::ReadAllText($runtimeConfig, [Text.Encoding]::UTF8) | ConvertFrom-Json

@@ -12,6 +12,13 @@ function Get-PrimaryWechatRoute {
     }
     return [pscustomobject]@{ recipient_instance = 'primary'; mode = 'primary_only'; data_directory = $directory }
 }
+function Resolve-PrimaryWechatNode {
+    $bundled=Join-Path $PSScriptRoot '..\..\..\node\node.exe'
+    if(Test-Path -LiteralPath $bundled -PathType Leaf){return [IO.Path]::GetFullPath($bundled)}
+    $found=Get-Command node.exe -ErrorAction SilentlyContinue
+    if($found){return $found.Source}
+    return 'C:\Program Files\nodejs\node.exe'
+}
 
 function Invoke-PrimaryWechatBridge {
     param([string]$Node, [string]$Script, [ValidateSet('status','send')][string]$Command, [string]$MessageFile,
