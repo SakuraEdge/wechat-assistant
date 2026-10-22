@@ -11,7 +11,7 @@
 | Windows 10 / 11 x64 | 已提供 EXE 安装包与内置运行环境便携包 | [下载最新 Release](https://github.com/SakuraEdge/wechat-assistant/releases/latest) |
 | macOS / Linux | 计划中，当前不能运行此 Windows 界面 | 后续按实际适配进展更新本页 |
 
-推荐下载 [v1.2.0 Windows 安装包](https://github.com/SakuraEdge/wechat-assistant/releases/download/v1.2.0/ClawBot-Instance-Manager-Setup-1.2.0-windows-x64.exe)，双击按向导安装。安装包内置经过SHA-256核对的Node.js 24.16.0及扫码依赖，无需手动安装Node/npm、运行命令或编译。
+推荐下载 [v1.3.0 Windows 安装包](https://github.com/SakuraEdge/wechat-assistant/releases/download/v1.3.0/ClawBot-Instance-Manager-Setup-1.3.0-windows-x64.exe)，双击按向导安装。安装包内置经过SHA-256核对的Node.js 24.16.0及扫码依赖，无需手动安装Node/npm、运行命令或编译。
 
 [Release 下载页](https://github.com/SakuraEdge/wechat-assistant/releases/latest)同时提供便携ZIP、文件清单和SHA256SUMS.txt。当前安装包未添加发布者代码签名，可核对Release中的SHA-256；软件不附带Codex账号或模型额度。
 
@@ -23,7 +23,7 @@ git clone https://github.com/SakuraEdge/wechat-assistant.git
 
 ## 安装包首次使用（推荐）
 
-1. 下载并双击 **ClawBot-Instance-Manager-Setup-1.2.0-windows-x64.exe**，按向导点击安装。默认安装到当前用户的`%LOCALAPPDATA%\Programs\ClawBotInstanceManager`，无需管理员权限，不修改系统PATH。
+1. 下载并双击 **ClawBot-Instance-Manager-Setup-1.3.0-windows-x64.exe**，按向导点击安装。默认安装到当前用户的`%LOCALAPPDATA%\Programs\ClawBotInstanceManager`，无需管理员权限，不修改系统PATH。
 2. 安装完成打开管理器。首次引导按步骤提示：打开并登录Codex → **复制连接提示** → 在Codex对话中粘贴发送 → 等助手明确说初始化完成。
 3. 回到管理器点击 **重新检测连接**。按钮会立即显示“正在检测”，完成后显示带时间的结果气泡并弹出结果提示；失败时按提示重新初始化。检测会实际请求客户端模型接口，首次引导不会阻塞后台检测。
 4. 检测通过后点击 **下一步：新增微信用户**，填写名称，再本人微信扫码；也可返回主界面点击 **新增微信用户**。连接Codex不等于已经新增或绑定微信。第一位为`primary`主用户，后续每人独立新增、独立扫码。发送“你好”核对回复后即可安排工作。
@@ -174,7 +174,7 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File src/Manager.ps1 -Se
 
 ## 更新记录
 
-- **2026-10-22 · v1.3.0源码 / 本地安装包**：首次引导新增清晰的步骤、检测进度/时间/结果弹窗和新增用户入口；新增账号五小时/每周额度与本地重置时间；新增GitHub正式版检测、校验下载及安装交接。此版本是否已公开发布，以Release页面为准；旧v1.2.0资产不会自动替换。
+- **2026-10-22 · v1.3.0**：首次引导新增清晰的步骤、检测进度/时间/结果弹窗和新增用户入口；新增账号五小时/每周额度与本地重置时间；新增GitHub正式版检测、校验下载及安装交接。Windows x64安装器、便携包和校验文件见[v1.3.0 Release](https://github.com/SakuraEdge/wechat-assistant/releases/tag/v1.3.0)；旧v1.2.0资产保留。
 
 - **2026-10-22 · v1.2.0后续源码修复**：修复从桌面启动时看不到Codex内已有实例的问题；统一原登记、实例数据与客户端连接路径，保留账号和服务。多份登记目录冲突会明确提示。已发布安装包的内容以对应Release说明为准。
 
