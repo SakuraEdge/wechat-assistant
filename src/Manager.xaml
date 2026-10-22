@@ -7,12 +7,12 @@
   <Style TargetType="{x:Type Button}" BasedOn="{StaticResource ModernButton}"/>
   <Style x:Key="PrimaryButton" TargetType="{x:Type Button}" BasedOn="{StaticResource ModernButton}"><Setter Property="Background" Value="#7864DC"/><Setter Property="BorderBrush" Value="#7864DC"/><Setter Property="Foreground" Value="White"/></Style>
   <Style x:Key="DangerButton" TargetType="{x:Type Button}" BasedOn="{StaticResource ModernButton}"><Setter Property="Foreground" Value="#A83A48"/><Setter Property="BorderBrush" Value="#E7C3C8"/></Style>
-  
+
   <Style x:Key="NavButton" TargetType="{x:Type RadioButton}">
    <Setter Property="Foreground" Value="#43465A"/><Setter Property="Background" Value="Transparent"/><Setter Property="FontSize" Value="14"/><Setter Property="Padding" Value="16,14"/><Setter Property="Margin" Value="0,0,0,5"/><Setter Property="Cursor" Value="Hand"/><Setter Property="FocusVisualStyle" Value="{x:Null}"/>
    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="{x:Type RadioButton}"><Border x:Name="NavChrome" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}"><ContentPresenter RecognizesAccessKey="True"/></Border><ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="NavChrome" Property="Background" Value="#EFEDF8"/></Trigger><Trigger Property="IsChecked" Value="True"><Setter TargetName="NavChrome" Property="Background" Value="#EDE8FC"/><Setter Property="Foreground" Value="#7864DC"/><Setter Property="FontWeight" Value="SemiBold"/></Trigger><Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="NavChrome" Property="BorderBrush" Value="#9E8CEB"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter>
   </Style>
-  
+
   <Style TargetType="{x:Type CheckBox}"><Setter Property="Margin" Value="0,7,24,7"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="Foreground" Value="#414357"/></Style>
   <Style TargetType="{x:Type TextBox}"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#DFE1EC"/><Setter Property="Padding" Value="10,8"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
   <Style TargetType="{x:Type ComboBox}">
