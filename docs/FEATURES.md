@@ -17,6 +17,7 @@
 | 工作工具范围 | owner保留官方客户端工具与原审批；standard仅跨项目所需6工具，关闭桌面控制；工作提示携带可信角色，转交也须保留角色 | core.mjs、project-bridge.mjs、access-policy.mjs；结合平台沙箱与审批，不承诺对恶意脚本的强隔离 |
 | 动态模型与强度 | 按实例配置，默认Sol6.1/high；从当前客户端model/list分页读取真实模型与supportedReasoningEfforts，保存前重新读取验证，不写死选项；闲聊与工作均使用实例选择 | model-policy.mjs、controller.mjs；不改变主聊天或全局提供商；服务空闲时生效，列表不可用则不保存 |
 | 可视化管理 | Windows WPF界面，实例列表/角色/绑定/最近接收/工作聊天，扫码新增、启停重启、权限开关、打开聊天与工作目录 | wechat-assistant-app/；本轮验证见软件包docs/VERIFICATION.md |
+| 桌面启动读取原实例 | 自动发现同一Windows用户普通目录或Codex应用专用目录的实例登记；逻辑/物理别名去重，只映射旧默认数据路径，保留自定义目录；多份登记报冲突，不合并身份、不复制认证 | instance-paths.mjs、desktop-connection.mjs、wechat-instance.ps1；桌面真机重开显示两个原实例，动态模型与原聊天可读 |
 | 独立软件包 | 双击ClawBot实例管理器.exe或打开ClawBot实例管理器.vbs，旧入口兼容；源码、运行快照、模板、文档、构建与审计均在独立目录 | README.md；公开仓库忽略认证、队列、二维码、node_modules、构建产物；平台支持与使用教程见README |
 | 管理器内聊天 | 所选实例独立只读窗口，每4秒刷新，最多300条近期收发；旧版仅有摘要时明确标注。附件只显示名称；不导出工具/推理/认证 | conversation-log.mjs、Dialogs.ps1；记录随现有DPAPI状态保存 |
 | 人设与命名 | 每实例独立persona/profile.json与按内容哈希保存的私人图片；默认GPT小姐两形象，可改助手自称和列表备注；不改变模型/角色权限 | persona-profile.mjs；校验格式、大小、数量、真实路径及目录链接 |
@@ -26,6 +27,8 @@
 | 迁移与依赖 | 新电脑需Windows、Node24+、已登录运行的Codex；旧机器DPAPI不迁移，微信重新扫码；首用在客户端初始化连接，后续本机可双击 | initialize.ps1、docs/MIGRATION.md；不含模型，不绕过客户端 |
 
 ## 版本与验证
+
+- 2026-10-22 · v1.2.0后续源码修复：新增7项路径回归，独立软件37项测试通过；本机桌面重开后原有两个实例、角色、绑定与Sol/high配置可见，model/list返回7模型，主实例原聊天记录可读，既有监听进程持续运行。未发布新安装包。
 
 - 2026-10-22 · v1.2.0：新增6项安装相关测试，覆盖文件篡改、清单路径/链接逃逸、首次连接状态与无全局Node的内置运行环境选择。安装、启动、保护和卸载使用本机隔离目录验收，发布结果以README和Release为准。
 

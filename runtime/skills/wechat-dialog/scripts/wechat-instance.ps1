@@ -18,8 +18,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $OutputEncoding
-$registryRoot = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Codex\wechat-dialog-instances'
-$configPath = Join-Path $registryRoot ($Name + '.json')
+$registryRoot = $null
+$dataRoot = $null
 $botScript = Join-Path $PSScriptRoot 'wechat-bot.mjs'
 function Write-InstanceResult($Value) { [Console]::Out.WriteLine(($Value | ConvertTo-Json -Depth 10 -Compress)) }
 function Resolve-Node {
@@ -47,6 +47,10 @@ function Read-Instance([string]$InstanceName) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw 'INSTANCE_NOT_REGISTERED' }
     $value = [IO.File]::ReadAllText($file, [Text.Encoding]::UTF8) | ConvertFrom-Json
     if ($value.name -ne $InstanceName -or -not [IO.Path]::IsPathRooted($value.data_directory) -or -not [IO.Path]::IsPathRooted($value.workspace)) { throw 'INVALID_INSTANCE_CONFIG' }
+    $legacy = if ($InstanceName -eq 'primary') { Join-Path $env:LOCALAPPDATA 'Codex\wechat-dialog' } else { Join-Path $env:LOCALAPPDATA ('Codex\wechat-dialog-instances\' + $InstanceName) }
+    if ([IO.Path]::GetFullPath($value.data_directory).TrimEnd('\') -ieq [IO.Path]::GetFullPath($legacy).TrimEnd('\')) {
+        $value.data_directory = if ($InstanceName -eq 'primary') { Join-Path $dataRoot 'wechat-dialog' } else { Join-Path $registryRoot $InstanceName }
+    }
     return $value
 }
 function Invoke-InstanceBot($Config, [string[]]$BotArguments) {
@@ -61,6 +65,11 @@ function Invoke-InstanceBot($Config, [string[]]$BotArguments) {
     } finally { $env:CODEX_WECHAT_DATA_DIR = $oldDir; $env:CODEX_WECHAT_INSTANCE = $oldName }
 }
 try {
+    $locations = & (Resolve-Node) (Join-Path $PSScriptRoot 'instance-paths.mjs') | Select-Object -Last 1 | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or $locations.status -ne 'instance_paths') { throw $locations.code }
+    $registryRoot = $locations.registry
+    $dataRoot = $locations.data_root
+    $configPath = Join-Path $registryRoot ($Name + '.json')
     if ($Action -eq 'List') {
         $instances = @()
         if (Test-Path -LiteralPath $registryRoot) {
@@ -78,7 +87,7 @@ try {
         $Workspace = [IO.Path]::GetFullPath($Workspace)
         if ($Workspace.TrimEnd('\') -eq [IO.Path]::GetPathRoot($Workspace).TrimEnd('\')) { throw 'WORKSPACE_ROOT_FORBIDDEN' }
         $directory = if ($Name -eq 'primary') {
-            Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Codex\wechat-dialog'
+            Join-Path $dataRoot 'wechat-dialog'
         } else { Join-Path $registryRoot $Name }
         if (Test-Path -LiteralPath $configPath) {
             $previous = Read-Instance $Name

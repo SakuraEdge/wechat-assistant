@@ -15,6 +15,7 @@ import {PROJECT_BRIDGE_VERSION,loadProjectToolConfig,prepareProjectResults,callP
 import {QUESTION_BROKER_VERSION,QuestionBroker} from './question-broker.mjs';
 import {ACCESS_POLICY_VERSION,loadAccessPolicy,policyFor,deniedRequest} from './access-policy.mjs';
 import {desktopEnvironment} from './desktop-connection.mjs';
+import {instancePaths,instanceDataDirectory} from './instance-paths.mjs';
 import {enqueueDesktopCommand,drainDesktopCommands} from './manager-commands.mjs';
 import {loadModelPolicy,modelFor,MODEL_POLICY_VERSION} from './model-policy.mjs';
 import {runtimePersona,PERSONA_VERSION} from './persona-profile.mjs';
@@ -23,7 +24,9 @@ import { downloadIncomingImage, validateLocalImage, uploadWechatImage } from './
 import { WechatApi, SecureStore, RpcClient, agentTurn, ingest, sleep, splitText, digest, checkedBase, WECHAT_PERMISSIONS, WECHAT_MODEL, WECHAT_THREAD_MODEL, confirmWechatPermissions, resumeWechatThread, acknowledgeEntry, isControlMessage } from './core.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = process.env.CODEX_WECHAT_DATA_DIR || path.join(process.env.LOCALAPPDATA, 'Codex', 'wechat-dialog');
+const locations=await instancePaths();
+process.env.CODEX_WECHAT_REGISTRY_DIR=locations.registry;
+const dataDir = instanceDataDirectory(process.env.CODEX_WECHAT_INSTANCE||'primary',process.env.CODEX_WECHAT_DATA_DIR || path.join(process.env.LOCALAPPDATA, 'Codex', 'wechat-dialog'),locations);
 const store = new SecureStore(dataDir, path.join(scriptDir, 'secure-store.ps1'));
 const metaFile = path.join(dataDir, 'status.json');
 const lockFile = path.join(dataDir, 'worker.lock');
@@ -49,7 +52,7 @@ async function prepare() {
   if (!existing.codex) throw new Error('CODEX_PATH_REQUIRED');
   existing.providerEnv ||= {};
   if(existing.instanceId!=='primary'&&!existing.providerEnv.OPENAI_API_KEY&&!process.env.OPENAI_API_KEY){
-    const primary=new SecureStore(path.join(process.env.LOCALAPPDATA,'Codex','wechat-dialog'),path.join(scriptDir,'secure-store.ps1'));
+    const primary=new SecureStore(path.join(locations.data_root,'wechat-dialog'),path.join(scriptDir,'secure-store.ps1'));
     const shared=await primary.load();
     for(const key of ['OPENAI_API_KEY','OPENAI_BASE_URL'])if(shared?.providerEnv?.[key])existing.providerEnv[key]=shared.providerEnv[key];
   }
@@ -286,7 +289,7 @@ async function run() {
   const rpc = new RpcClient(state.codex, persistedEnv(state),undefined,{appTools:true});
   rpc.projectConfig=await loadProjectToolConfig(process.env,policyFor(state));
   let running = true; let busy = false; let chatBusy = false; let attachmentBusy = false; let unhealthy = false; let outboxBusy = false;
-  const questionDir=path.join(process.env.LOCALAPPDATA,'Codex','wechat-questions');
+  const questionDir=path.join(locations.data_root,'wechat-questions');
   const questionBroker=new QuestionBroker(questionDir,new SecureStore(questionDir,path.join(scriptDir,'secure-store.ps1')));
   let questionSyncBusy=false,lastQuestionSync=0;
   let desktopCommandsBusy=false;

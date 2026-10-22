@@ -4,10 +4,10 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {setupStatus} from './setup-status.mjs';
+import {instancePaths,instanceDataDirectory} from '../runtime/skills/wechat-dialog/scripts/instance-paths.mjs';
 
 export const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const profile=process.env.LOCALAPPDATA;
-const registry=path.join(profile,'Codex','wechat-dialog-instances');
 const manager=path.join(profile,'Codex','wechat-manager');
 const runtime=path.join(appRoot,'runtime','skills');
 const scripts=path.join(runtime,'wechat-dialog','scripts');
@@ -17,7 +17,7 @@ export const validName=name=>typeof name==='string'&&/^[a-z][a-z0-9-]{0,47}$/.te
 const alive=pid=>{if(!Number.isInteger(pid)||pid<=0)return false;try{process.kill(pid,0);return true;}catch{return false;}};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function json(file,fallback=null){try{return JSON.parse((await fs.readFile(file,'utf8')).replace(/^\uFEFF/,''));}catch(error){if(error.code==='ENOENT')return fallback;throw Error('CONFIG_INVALID');}}
-export async function config(name){if(!validName(name))throw Error('INVALID_INSTANCE');const c=await json(path.join(registry,name+'.json'));if(!c||c.name!==name||!path.isAbsolute(c.workspace)||!path.isAbsolute(c.data_directory))throw Error('INSTANCE_NOT_REGISTERED');return c;}
+export async function config(name){if(!validName(name))throw Error('INVALID_INSTANCE');const locations=await instancePaths();const c=await json(path.join(locations.registry,name+'.json'));if(!c||c.name!==name||!path.isAbsolute(c.workspace)||!path.isAbsolute(c.data_directory))throw Error('INSTANCE_NOT_REGISTERED');return {...c,data_directory:instanceDataDirectory(name,c.data_directory,locations)};}
 async function modules(){return import(pathToFileURL(path.join(scripts,'access-policy.mjs')));}
 async function env(){const {SecureStore}=await import(pathToFileURL(path.join(scripts,'core.mjs')));const {desktopEnvironment}=await import(pathToFileURL(path.join(scripts,'desktop-connection.mjs')));return desktopEnvironment(SecureStore,path.join(scripts,'secure-store.ps1'));}
 async function run(exe,args,options={}){
@@ -30,7 +30,7 @@ async function run(exe,args,options={}){
     });
   });
 }
-async function manage(action,name,extra=[]){const environment=await env();return run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',ps,'-Action',action,'-Name',name,'-NodePath',process.execPath,...extra],{env:environment});}
+async function manage(action,name,extra=[]){const environment={...await env(),CODEX_WECHAT_REGISTRY_DIR:(await instancePaths()).registry};return run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',ps,'-Action',action,'-Name',name,'-NodePath',process.execPath,...extra],{env:environment});}
 async function invoke(c,args){return run(process.execPath,[bot,...args],{env:{...await env(),CODEX_WECHAT_INSTANCE:c.name,CODEX_WECHAT_DATA_DIR:c.data_directory}});}
 async function current(c){const value=await json(path.join(c.data_directory,'status.json'),{});return {...value,running:!!(value.running&&alive(value.pid))};}
 export function isBusy(status){return status.running&&!!(status.phase==='working'||status.queued>0||status.chat_busy||status.attachment_busy);}
@@ -47,6 +47,7 @@ async function prepare(c){const s=await current(c);if(s.configured)return;if(s.r
 export async function snapshot(){
   const {DEFAULT_PERSONA}=await import(pathToFileURL(path.join(scripts,'persona-profile.mjs')));
   const default_persona={...DEFAULT_PERSONA,references:['gpt-dragon.png','fish-cosplay.png'].map((file,i)=>({path:path.join(appRoot,'templates','workspace','outputs','persona','references',file),label:i?'大肥鱼（cosplay）':'GPT小姐（本体）'}))};
+  const {registry}=await instancePaths();
   let names;try{names=(await fs.readdir(registry)).filter(name=>/^[a-z][a-z0-9-]{0,47}\.json$/.test(name));}catch(error){if(error.code==='ENOENT')names=[];else throw error;}
   const labels=await json(path.join(manager,'labels.json'),{});const {loadAccessPolicy}=await modules();
   const instances=await Promise.all(names.map(async file=>{const name=file.slice(0,-5);try{
@@ -65,7 +66,8 @@ export async function catalog({refresh=false}={}){
  if(!refresh&&cached&&Date.now()-Date.parse(cached.retrieved_at)<300000)return cached;
  const {SecureStore,RpcClient}=await import(pathToFileURL(path.join(scripts,'core.mjs')));
  const {normalizeCatalog}=await import(pathToFileURL(path.join(scripts,'model-policy.mjs')));
- const state=await new SecureStore(path.join(profile,'Codex','wechat-dialog'),path.join(scripts,'secure-store.ps1')).load()||{};
+ let primary;try{primary=await config('primary');}catch(error){if(error.message!=='INSTANCE_NOT_REGISTERED')throw error;}
+ const state=await new SecureStore(primary?.data_directory||path.join(profile,'Codex','wechat-dialog'),path.join(scripts,'secure-store.ps1')).load()||{};
  const environment={...await env(),...(state.providerEnv||{})};const executable=state.codex||environment.CODEX_CLI_PATH;if(!executable)throw Error('CODEX_PATH_REQUIRED');
  const rpc=new RpcClient(executable,environment);let items=[],cursor;
  try{await rpc.initialize();for(let page=0;page<20;page++){const result=await rpc.request('model/list',{includeHidden:false,limit:100,...(cursor?{cursor}:{})},45000);items.push(...result.data);if(!result.nextCursor){cursor=null;break;}if(result.nextCursor===cursor)throw Error('MODEL_LIST_INCOMPLETE');cursor=result.nextCursor;}if(cursor)throw Error('MODEL_LIST_INCOMPLETE');}

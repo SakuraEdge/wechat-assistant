@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "docs/FEATURES.md",
-      "sha256": "5ffe7e1e454b80f63b88ba58a0e4fce74ef92c1550b194a5984a2a3d7365fb13"
+      "sha256": "73df1dd25f5470dc982ebbfc0ed66705572347df1347242362b9f5e59e78de9e"
     },
     {
       "path": "docs/OPERATIONS.md",
@@ -35,7 +35,7 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/desktop-connection.mjs",
-      "sha256": "1f6f704b8e681adbcd6f5b6ec8d665bc656537e9a91de00ce4f784b39d606bed"
+      "sha256": "44fb7eec5beb5bb801e52a3d7a98c2f5384e17a269694a412d100b5f816fcad0"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/fast-chat.mjs",
@@ -48,6 +48,10 @@
     {
       "path": "runtime/skills/wechat-dialog/scripts/file-transfer.mjs",
       "sha256": "74e8080b61496fb4e0a94a83cdf2f93e4c59f23bab1b6c3ef918e665953ae5bc"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/instance-paths.mjs",
+      "sha256": "f0600b6da5445e309fedec9df9e3557d761e0ba3e0138b13c7a5c488d8855997"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/manager-commands.mjs",
@@ -87,11 +91,11 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-bot.mjs",
-      "sha256": "e95cd73890db90b78398332dc603b18ccae5f4e8579ef1f6546777006f071c06"
+      "sha256": "417ae274734cb267ff04251b619987f201ec27ffde18f3ca03cbd600521ae4f9"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-instance.ps1",
-      "sha256": "0f50a76c3edb152898391ffcd4797fc90c100f4ec7c83d69a1a628f74ba65105"
+      "sha256": "d9da5ae7ccb17f1826a66fd6ce4e91cbf4db8480f9ce6a6f62c8c4736b498ced"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-question.mjs",

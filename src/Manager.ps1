@@ -13,6 +13,9 @@ $script:jobs=[Collections.ArrayList]::new()
 $script:setupRequested=$false;$script:setupShown=$false;$script:setupState=$null;$script:setupDialog=$null
 $script:rows=@();$script:selection='';$script:lastRefresh=[datetime]::MinValue;$script:catalog=@();$script:modelsRequested=$false;$script:bindingModel=$false
 $script:errors=@{
+ INSTANCE_REGISTRY_AMBIGUOUS='检测到多份实例登记目录，已暂停自动选择。请在Codex中检查并指定原有实例目录，勿重新扫码覆盖。'
+ INSTANCE_REGISTRY_UNREADABLE='无法读取本机实例登记目录，请检查当前Windows用户及目录访问权限。'
+ DESKTOP_CONNECTION_UNREADABLE='无法读取原有客户端连接，请在当前Codex中重新初始化连接。'
  CLIENT_CONNECTION_REQUIRED='请先点击“首次使用 / 连接客户端”，在已登录的Codex中完成连接初始化。'
  INSTANCE_BUSY='该实例有工作、附件或聊天正在处理，请稍后再保存权限或重启。'
  WECHAT_LOGIN_REQUIRED='尚未绑定微信，请点“扫码连接”。'
