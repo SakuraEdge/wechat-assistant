@@ -16,7 +16,7 @@
 | 主用户 / 日常用户 | primary始终owner，可管理客户端/权限/服务/项目；其他默认standard，日常功能全开；可显式授予delegate或关闭生图/文件/跨项目 | access-policy.mjs；侧车策略access-policy.json，重启生效；业务权限不是独立Windows账号隔离 |
 | 工作工具范围 | owner保留官方客户端工具与原审批；standard仅跨项目所需6工具，关闭桌面控制；工作提示携带可信角色，转交也须保留角色 | core.mjs、project-bridge.mjs、access-policy.mjs；结合平台沙箱与审批，不承诺对恶意脚本的强隔离 |
 | 动态模型与强度 | 按实例配置，默认Sol6.1/high；从当前客户端model/list分页读取真实模型与supportedReasoningEfforts，保存前重新读取验证，不写死选项；闲聊与工作均使用实例选择 | model-policy.mjs、controller.mjs；不改变主聊天或全局提供商；服务空闲时生效，列表不可用则不保存 |
-| 可视化管理 | Windows WPF界面，实例列表/角色/绑定/最近接收/工作聊天，扫码新增、启停重启、权限开关、打开聊天与工作目录 | wechat-assistant-app/；本轮验证见软件包docs/VERIFICATION.md |
+| 可视化管理 | Windows WPF界面，左侧按概览、实例与服务、权限与能力、模型与人设、账户额度、软件更新分页；顶部统一选择实例，概览显示运行摘要和关键状态，原扫码、启停、权限、模型、人设、聊天与目录操作保留 | Manager.ps1、Dialogs.ps1、Dashboard.ps1；六页WPF加载和Windows 200%截图核对，详见docs/VERIFICATION.md |
 | 桌面启动读取原实例 | 自动发现同一Windows用户普通目录或Codex应用专用目录的实例登记；逻辑/物理别名去重，只映射旧默认数据路径，保留自定义目录；多份登记报冲突，不合并身份、不复制认证 | instance-paths.mjs、desktop-connection.mjs、wechat-instance.ps1；桌面真机重开显示两个原实例，动态模型与原聊天可读 |
 | 独立软件包 | 双击ClawBot实例管理器.exe或打开ClawBot实例管理器.vbs，旧入口兼容；源码、运行快照、模板、文档、构建与审计均在独立目录 | README.md；公开仓库忽略认证、队列、二维码、node_modules、构建产物；平台支持与使用教程见README |
 | 管理器内聊天 | 所选实例独立只读窗口，每4秒刷新，最多300条近期收发；旧版仅有摘要时明确标注。附件只显示名称；不导出工具/推理/认证 | conversation-log.mjs、Dialogs.ps1；记录随现有DPAPI状态保存 |
@@ -30,6 +30,8 @@
 | 迁移与依赖 | 新电脑需Windows、Node24+、已登录运行的Codex；旧机器DPAPI不迁移，微信重新扫码；首用在客户端初始化连接，后续本机可双击 | initialize.ps1、docs/MIGRATION.md；不含模型，不绕过客户端 |
 
 ## 版本与验证
+
+- 2026-10-22 · v1.4.0源码候选：新增侧栏分页与全局实例选择器，账号额度和软件更新标注独立数据范围；模型列表失败时显示实例当前模型/强度。六页分页自检及实际窗口截图通过，尚未创建正式Release。
 
 - 2026-10-22 · v1.3.0发行：50项软件测试，真实额度、连接成功/失败弹窗、首开空白配置、用户入口与下载校验已验证；Windows安装器、便携包及SHA-256校验文件见对应Release。发行验证范围与平台边界见docs/VERIFICATION.md。
 
