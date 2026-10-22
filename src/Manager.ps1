@@ -266,7 +266,7 @@ function Apply-Snapshot($value){
  $pending=0;foreach($row in $script:rows){$pending+=[int]$row.queued}
  $script:ui.StatInstances.Text=[string]$items.Count;$script:ui.InstanceCount.Text=[string]$items.Count
  $script:ui.StatRunning.Text=[string]$online;$script:ui.StatPending.Text=[string]$pending
- $script:ui.Instances.Height=36+74*[Math]::Min([Math]::Max(1,$items.Count),5)+2
+ $script:ui.Instances.Height=38+80*[Math]::Min([Math]::Max(1,$items.Count),5)+2
  $attention=@($script:rows|Where-Object {$_.error -or $_.phase -eq 'needs_attention'}).Count
  $health=if(-not $items.Count){'等待添加微信实例'}elseif($attention){'有实例需要检查'}elseif($online -eq $items.Count){'服务运行正常'}else{'有实例尚未运行'}
  $script:ui.ServiceHealth.Text=$health
