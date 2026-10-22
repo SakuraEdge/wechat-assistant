@@ -9,8 +9,8 @@ using System.Reflection;
 [assembly: AssemblyTitle("ClawBot实例管理器")]
 [assembly: AssemblyDescription("ClawBot实例管理器")]
 [assembly: AssemblyProduct("ClawBot实例管理器")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 static class Launcher {
  [DllImport("shell32.dll", CharSet=CharSet.Unicode)] static extern int SetCurrentProcessExplicitAppUserModelID(string id);
  [STAThread] static void Main() {

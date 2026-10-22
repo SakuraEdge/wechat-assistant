@@ -4,24 +4,39 @@
 }
 function New-SetupDialog {
  return Read-Dialog @'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="首次使用 / 连接客户端" Width="720" Height="650" MinHeight="590" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F4F6FB"><Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel><TextBlock Text="连接你的 Codex 与微信" FontSize="23" FontWeight="SemiBold" Foreground="#26324A"/><TextBlock Text="1 安装已完成：程序与运行环境由安装包自动部署。&#10;2 登录 Codex，将下方连接提示发到 Codex 对话，等待初始化完成。&#10;3 回到本窗口重新检测，然后新增微信用户并由本人扫码。" TextWrapping="Wrap" LineHeight="25" Margin="0,14,0,12"/></StackPanel><TextBlock Name="SetupStatus" Grid.Row="1" Text="正在检测连接配置…" Foreground="#6454D9" Margin="0,0,0,12" TextWrapping="Wrap"/><TextBox Name="Prompt" Grid.Row="2" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="14"/><StackPanel Grid.Row="3" Margin="0,14,0,0"><TextBlock Text="本人登录与扫码需要用户完成；软件不附带账号或额度。连接信息由当前客户端提供，不能从其他电脑复制。" TextWrapping="Wrap" Foreground="#69758C" Margin="0,0,0,12"/><WrapPanel><Button Name="CopyPrompt" Content="复制连接提示" Padding="14,9" Margin="0,0,10,0"/><Button Name="CheckConnection" Content="重新检测连接" Padding="14,9" Margin="0,0,10,0"/><Button Name="CloseGuide" Content="返回管理器" Padding="14,9"/></WrapPanel></StackPanel></Grid></Window>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="首次使用 / 连接客户端" Width="760" Height="730" MinHeight="620" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F4F6FB"><Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><StackPanel><TextBlock Text="首次使用：连接完成后，还要新增微信用户" FontSize="21" FontWeight="SemiBold" Foreground="#26324A"/><TextBlock Text="① 打开并登录 Codex，保持客户端运行。&#10;② 点击“复制连接提示”，粘贴到 Codex 对话并发送，等待助手明确说初始化完成。&#10;③ 回到这里点击“重新检测连接”，查看检测结果。&#10;④ 检测通过后，点击“下一步：新增微信用户”，填写名称，再用本人微信扫码。" TextWrapping="Wrap" LineHeight="26" Margin="0,14,0,12"/><TextBlock Text="连接客户端 ≠ 已绑定微信。第一位用户是 primary 主用户，后续用户需要分别新增和扫码。" TextWrapping="Wrap" Foreground="#6454D9" Margin="0,0,0,14"/></StackPanel><Border Name="SetupToast" Grid.Row="1" Background="#E9E6FD" CornerRadius="8" Padding="13" Margin="0,0,0,12"><TextBlock Name="SetupStatus" Text="正在检测连接配置…" Foreground="#493A9E" TextWrapping="Wrap" LineHeight="23"/></Border><TextBox Name="Prompt" Grid.Row="2" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="14"/><StackPanel Grid.Row="3" Margin="0,14,0,0"><TextBlock Text="只有本人登录、初始化和扫码完成后才能使用。连接信息保存在本机，不要复制其他电脑的账号文件。" TextWrapping="Wrap" Foreground="#69758C" Margin="0,0,0,12"/><WrapPanel><Button Name="CopyPrompt" Content="复制连接提示" Padding="12,9" Margin="0,0,8,8"/><Button Name="CheckConnection" Content="重新检测连接" Padding="12,9" Margin="0,0,8,8"/><Button Name="NextUser" Content="下一步：新增微信用户" IsEnabled="False" Padding="12,9" Margin="0,0,8,8" Background="#6454D9" Foreground="White"/><Button Name="CloseGuide" Content="稍后设置" Padding="12,9" Margin="0,0,0,8"/></WrapPanel></StackPanel></Grid></Window>
 '@
 }
 function Update-SetupDialog {
  if(-not $script:setupDialog -or -not $script:setupDialog.IsVisible -or -not $script:setupState){return}
- $dialog=$script:setupDialog;$state=$script:setupState;$dialog.FindName('Prompt').Text=$state.prompt
+ $dialog=$script:setupDialog;$state=$script:setupState;if($state.prompt){$dialog.FindName('Prompt').Text=$state.prompt}
  $runtime=if($state.bundled_node){'内置运行环境已就绪'}else{'Node '+$state.node_version+' 已就绪'}
- $dialog.FindName('SetupStatus').Text=$runtime+' · '+$(if($state.ready){'客户端连接配置已就绪，可返回管理器读取模型校验。'}else{'尚未完成客户端连接，请发送下方提示到已登录的Codex。'})
+ $checked=if($state.checked_at){([datetime]$state.checked_at).ToLocalTime().ToString('HH:mm:ss')}else{'—'}
+ $dialog.FindName('NextUser').IsEnabled=[bool]$state.ready
+ $dialog.FindName('CheckConnection').IsEnabled=$true;$dialog.FindName('CheckConnection').Content='重新检测连接'
+ $dialog.FindName('SetupToast').Background=if($state.ready){'#E3F4ED'}else{'#FFF0E8'}
+ $dialog.FindName('SetupStatus').Text=$runtime+' · 检测时间 '+$checked+"`n"+$(if($state.client_verified){'检测通过：客户端可以正常响应，桌面连接已配置。下一步：点击“新增微信用户”，填写名称并本人微信扫码。'}elseif($state.ready){'已发现连接配置。可以点击“重新检测连接”实际验证，或继续新增微信用户。'}elseif($state.connection_error){'检测未通过：客户端尚不能正常响应。请保持Codex运行，在Codex重新发送下方提示，初始化完成后再次检测。'}else{'尚未完成连接：请先复制下方提示，在已登录的Codex对话中发送，等初始化完成后重新检测。'})
+}
+function Complete-SetupCheck($state,[bool]$popup=$false){
+ $script:setupState=$state;Update-SetupDialog
+ $message=if($state.ready){'检测通过。下一步：新增微信用户，填写名称并本人扫码。'}else{'检测未通过。请在已登录的Codex对话中发送连接提示，等待初始化完成后再检测。'}
+ Say $message (-not $state.ready)
+ if($popup -and $script:setupDialog -and $script:setupDialog.IsVisible){[void][Windows.MessageBox]::Show($script:setupDialog,$message,'连接检测结果',[Windows.MessageBoxButton]::OK,$(if($state.ready){[Windows.MessageBoxImage]::Information}else{[Windows.MessageBoxImage]::Warning}))}
 }
 function Show-Setup {
  if($script:setupDialog -and $script:setupDialog.IsVisible){[void]$script:setupDialog.Activate();return}
  $script:setupShown=$true;$dialog=New-SetupDialog;$script:setupDialog=$dialog
  $dialog.FindName('CopyPrompt').Add_Click({$dlg=[Windows.Window]::GetWindow($this);$text=$dlg.FindName('Prompt').Text;if($text){[Windows.Clipboard]::SetText($text);$dlg.FindName('SetupStatus').Text='连接提示已复制，请粘贴到Codex对话并发送。'}})
- $dialog.FindName('CheckConnection').Add_Click({[void](Begin-JobCommand @{action='setup-status';name=''})})
+ $dialog.FindName('CheckConnection').Add_Click({
+  $dlg=[Windows.Window]::GetWindow($this);$dlg.FindName('SetupStatus').Text='正在实际检测客户端连接，请稍候…';$this.IsEnabled=$false;$this.Content='正在检测…'
+  if(-not (Begin-JobCommand @{action='setup-status';name='';verify=$true;user_feedback=$true})){$script:setupVerifyRequested=$true;$dlg.FindName('SetupStatus').Text='已有检测正在进行，随后会自动验证客户端连接，请稍候…'}
+ })
+ $dialog.FindName('NextUser').Add_Click({$script:addAfterSetup=$true;[Windows.Window]::GetWindow($this).Close()})
  $dialog.FindName('CloseGuide').Add_Click({[Windows.Window]::GetWindow($this).Close()})
  $dialog.Add_ContentRendered({Update-SetupDialog})
  [void](Begin-JobCommand @{action='setup-status';name=''})
  [void]$dialog.ShowDialog();$script:setupDialog=$null
+ if($script:addAfterSetup){$script:addAfterSetup=$false;Add-User}
 }
 function New-PersonaDialog {
  return Read-Dialog @'

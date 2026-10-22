@@ -25,6 +25,8 @@
 
 先提交并推送已验证的软件变更（中文commit）。创建对应提交的草稿Release，上传四个资产并核对远端SHA-256/大小、实际下载内容，再转为公开Release；发布后核对标签提交、资产及公开下载。现有公开版本不静默替换资产，修复使用新版本。未知结果先读取远端状态，不盲目重新创建或覆盖。
 
+v1.3.0起管理器可主动检测此仓库正式版。保持标签`v主.次.修订`与安装器名`ClawBot-Instance-Manager-Setup-<版本>-windows-x64.exe`一致，发布`SHA256SUMS.txt`并保留GitHub资产的size/digest。客户端拒绝缺少校验信息的安装包、预发行版、非固定仓库的下载链接和降级。源码提交并不等于已有可下载的新版Release。
+
 ```powershell
 node tools/publish-release.mjs --publish --commit <已推送的完整提交SHA>
 ```

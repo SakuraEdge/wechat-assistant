@@ -23,6 +23,9 @@
 | 人设与命名 | 每实例独立persona/profile.json与按内容哈希保存的私人图片；默认GPT小姐两形象，可改助手自称和列表备注；不改变模型/角色权限 | persona-profile.mjs；校验格式、大小、数量、真实路径及目录链接 |
 | 程序名称与图标 | ClawBot实例管理器窗口、EXE版本描述和图标统一；旧启动器转新EXE，Node后台进程仍显示运行时名称 | Launcher.cs、LegacyLauncher.cs、assets/clawbot.ico |
 | Windows安装器 | 当前用户无管理员安装、桌面/开始菜单/卸载项、固定Node与扫码依赖；首次向导引导本人Codex连接和微信扫码；运行中拒绝覆盖，不复制账号或改PATH | installer/、tools/build-release.mjs；发布资产附SHA-256与安装清单 |
+| 首次引导与检测反馈 | 四步流程；重新检测立即显示忙碌状态，实际请求客户端模型接口，带时间的状态气泡和结果弹窗；检测后可直接新增用户，自动打开引导不阻塞检测计时器 | Dialogs.ps1、setup-status.mjs、Manager.ps1；新用户仍需本人登录、初始化和扫码 |
+| Codex账号额度 | 五小时/每周的剩余与已用比例、本机时区重置时间；多分组选择，连接就绪读取、5分钟刷新或手动刷新；未提供不当成零 | account-usage.mjs、Dashboard.ps1；官方account/rateLimits/read，只读账号共享额度，不兑换重置 |
+| 检测更新与安装 | 用户触发正式Release检测；固定仓库、版本比较、GitHub下载地址、大小/SHA-256验证；安装版只停本目录空闲实例，退出后交接安装，之后尝试恢复服务 | updates.mjs、ApplyUpdate.ps1、update-processes.ps1；源码/便携版仅下载到独立目录，不原地覆盖；不自动发布新Release |
 | 安装完整性与卸载 | 安装后逐文件核对哈希；安装/卸载检查目标目录进程，不强杀；卸载保留用户目录认证/队列/设置/聊天/工作文件 | SetupGuard.cs、verify-payload.mjs、installer测试；同机隔离安装目录验收，不声称已在另一电脑测试 |
 | 迁移与依赖 | 新电脑需Windows、Node24+、已登录运行的Codex；旧机器DPAPI不迁移，微信重新扫码；首用在客户端初始化连接，后续本机可双击 | initialize.ps1、docs/MIGRATION.md；不含模型，不绕过客户端 |
 

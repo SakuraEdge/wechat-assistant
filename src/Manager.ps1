@@ -6,11 +6,14 @@ $script:appRoot=Split-Path $PSScriptRoot -Parent
 $script:controller=Join-Path $PSScriptRoot 'controller.mjs'
 . (Join-Path $PSScriptRoot 'Runtime.ps1')
 $script:node=Resolve-ManagerNode $script:appRoot
-$script:manager=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Codex\wechat-manager'
+$script:manager=Join-Path $env:LOCALAPPDATA 'Codex\wechat-manager'
 $script:jobsDir=Join-Path $script:manager 'jobs'
 [void][IO.Directory]::CreateDirectory($script:jobsDir)
 $script:jobs=[Collections.ArrayList]::new()
 $script:setupRequested=$false;$script:setupShown=$false;$script:setupState=$null;$script:setupDialog=$null
+$script:snapshotLoaded=$false;$script:addAfterSetup=$false;$script:usageState=$null;$script:lastUsage=[datetime]::MinValue
+$script:setupVerifyRequested=$false
+$script:updateState=$null;$script:downloadState=$null;$script:updateDialog=$null;$script:installPending=$false
 $script:rows=@();$script:selection='';$script:lastRefresh=[datetime]::MinValue;$script:catalog=@();$script:modelsRequested=$false;$script:bindingModel=$false
 $script:errors=@{
  INSTANCE_REGISTRY_AMBIGUOUS='检测到多份实例登记目录，已暂停自动选择。请在Codex中检查并指定原有实例目录，勿重新扫码覆盖。'
@@ -42,6 +45,20 @@ $script:errors=@{
  PERSONA_IMAGE_INVALID='参考图无效或超过10MiB，请选择有效的PNG、JPEG或WebP文件。'
  PERSONA_PATH_REJECTED='参考图或保存目录不在允许范围，请检查目录链接。'
  PERSONA_CONFIG_INVALID='此实例人设配置无效，请检查本机配置后重试。'
+ UPDATE_NETWORK_FAILED='检测更新失败，请检查联网后重新检测。'
+ UPDATE_DOWNLOAD_FAILED='安装包下载失败，请检查联网并重新下载。'
+ UPDATE_RATE_LIMITED='GitHub暂时限制请求，请稍后再检测更新。'
+ UPDATE_RELEASE_INVALID='GitHub发行信息无效，本次不会下载或安装。'
+ UPDATE_ASSET_MISSING='新版本尚未提供唯一可用的Windows安装包，请稍后再检测。'
+ UPDATE_ASSET_INVALID='安装包大小或SHA-256信息不完整，本次不会安装。'
+ UPDATE_URL_REJECTED='下载地址不属于本软件的可信GitHub发行地址，已停止更新。'
+ UPDATE_HASH_MISMATCH='安装包校验失败，请重新下载；本次没有运行安装程序。'
+ UPDATE_SIZE_MISMATCH='安装包长度与发行记录不符，请重新下载。'
+ UPDATE_PATH_REJECTED='更新文件目录存在异常链接，请检查本机下载目录后重试。'
+ UPDATE_CHANGED_RECHECK='发行版本已变化或当前没有可安装更新，请重新检测。'
+ UPDATE_INSTALLER_ONLY='当前为源码或便携目录，请打开下载目录，在独立目录安装。'
+ UPDATE_HANDOFF_FAILED='无法准备安装，管理窗口保持打开；已停止的服务将尝试恢复。'
+ UPDATE_PROCESS_UNVERIFIED='无法核对本安装目录的服务进程，请稍后重试，或手动停止服务再更新。'
 }
 [xml]$xaml=@'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="ClawBot实例管理器" Width="1280" Height="920" MinWidth="1100" MinHeight="820" WindowStartupLocation="CenterScreen" Background="#F4F6FB" FontFamily="Microsoft YaHei UI" FontSize="13">
@@ -52,9 +69,11 @@ $script:errors=@{
  <Grid Margin="24"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Grid Margin="0,0,0,20"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <StackPanel><TextBlock Text="ClawBot实例管理器" FontSize="28" FontWeight="SemiBold" Foreground="#24304A"/><TextBlock Text="每个账号独立连接 · 主用户统一管理" Foreground="#69758C" Margin="0,7,0,0"/></StackPanel>
-   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button Name="Setup" Content="首次使用 / 连接客户端"/><Button Name="Refresh" Content="刷新状态"/><Button Name="Add" Content="＋ 新增微信用户" Background="#6454D9" Foreground="White" BorderBrush="#6454D9"/></StackPanel>
+   <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button Name="Setup" Content="首次使用 / 连接客户端"/><Button Name="Update" Content="检测更新"/><Button Name="Refresh" Content="刷新状态"/><Button Name="Add" Content="＋ 新增微信用户" Background="#6454D9" Foreground="White" BorderBrush="#6454D9"/></StackPanel>
   </Grid>
-  <Border Grid.Row="1" Background="#E9E6FD" CornerRadius="10" Padding="16,12" Margin="0,0,0,14"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Name="Summary" Text="正在读取实例状态…" Foreground="#493A9E"/><TextBlock Grid.Column="1" Text="模型与强度按实例设置　|　完成通知 → primary" Foreground="#655A9C"/></Grid></Border>
+  <StackPanel Grid.Row="1"><Border Background="#E9E6FD" CornerRadius="10" Padding="16,12" Margin="0,0,0,10"><Grid><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Name="Summary" Text="正在读取实例状态…" Foreground="#493A9E"/><TextBlock Grid.Column="1" Text="模型与强度按实例设置　|　完成通知 → primary" Foreground="#655A9C"/></Grid></Border>
+   <Border Background="White" CornerRadius="10" Padding="16,10" Margin="0,0,0,12" BorderBrush="#E0E5EF" BorderThickness="1"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.1*"/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions><StackPanel Margin="0,0,18,0"><WrapPanel><TextBlock Text="Codex账号额度" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0"/><ComboBox Name="UsageBucket" Width="125" DisplayMemberPath="label" SelectedValuePath="id" VerticalAlignment="Center"/></WrapPanel><TextBlock Name="UsageHint" Text="连接客户端后读取；未提供的额度显示未知。" FontSize="11" TextWrapping="Wrap" Foreground="#758096" Margin="0,8,0,5"/><Button Name="RefreshUsage" Content="刷新额度" HorizontalAlignment="Left" Padding="10,4"/></StackPanel><StackPanel Grid.Column="1" Margin="0,0,18,0"><TextBlock Text="五小时额度" FontWeight="SemiBold"/><TextBlock Name="FiveUsage" Text="尚未读取" Margin="0,5,0,6"/><ProgressBar Name="FiveProgress" Minimum="0" Maximum="100" Value="0" Height="7" Foreground="#6454D9" Background="#EAE7FA"/><TextBlock Name="FiveReset" Text="重置：未提供" FontSize="11" Foreground="#758096" Margin="0,7,0,0"/></StackPanel><StackPanel Grid.Column="2"><TextBlock Text="每周额度" FontWeight="SemiBold"/><TextBlock Name="WeekUsage" Text="尚未读取" Margin="0,5,0,6"/><ProgressBar Name="WeekProgress" Minimum="0" Maximum="100" Value="0" Height="7" Foreground="#398E79" Background="#E1F0EB"/><TextBlock Name="WeekReset" Text="重置：未提供" FontSize="11" Foreground="#758096" Margin="0,7,0,0"/></StackPanel></Grid></Border>
+  </StackPanel>
   <DataGrid Name="Instances" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single" SelectionUnit="FullRow" GridLinesVisibility="Horizontal" HeadersVisibility="Column" RowHeight="48" Background="White" BorderBrush="#E0E5EF" AlternatingRowBackground="#FAFBFE" HorizontalScrollBarVisibility="Auto">
    <DataGrid.Columns>
     <DataGridTextColumn Header="微信用户 / 实例" Binding="{Binding Display}" Width="210"/>
@@ -94,16 +113,17 @@ $script:window.MinHeight=[Math]::Min(740,[Windows.SystemParameters]::WorkArea.He
 $script:window.Height=[Math]::Min(850,[Windows.SystemParameters]::WorkArea.Height-20)
 $script:window.MinWidth=[Math]::Min(1100,[Windows.SystemParameters]::WorkArea.Width-30)
 $script:window.Width=[Math]::Min(1280,[Windows.SystemParameters]::WorkArea.Width-20)
-$script:ui=@{};foreach($name in @('Refresh','Add','Summary','Instances','Detail','Workspace','Chat','Connect','Start','Stop','Restart','OpenChat','OpenFolder','Role','Images','Files','Projects','Save','Message','Model','Effort','RefreshModels','SaveModel','ModelInfo','Persona','PersonaInfo','OpenCodex','Setup')){$script:ui[$name]=$script:window.FindName($name)}
+$script:ui=@{};foreach($name in @('Refresh','Add','Summary','Instances','Detail','Workspace','Chat','Connect','Start','Stop','Restart','OpenChat','OpenFolder','Role','Images','Files','Projects','Save','Message','Model','Effort','RefreshModels','SaveModel','ModelInfo','Persona','PersonaInfo','OpenCodex','Setup','Update','UsageBucket','UsageHint','RefreshUsage','FiveUsage','FiveProgress','FiveReset','WeekUsage','WeekProgress','WeekReset')){$script:ui[$name]=$script:window.FindName($name)}
 $iconPath=Join-Path $script:appRoot 'assets\clawbot.ico'
 if(Test-Path -LiteralPath $iconPath){$script:window.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$iconPath)}
 . (Join-Path $PSScriptRoot 'Dialogs.ps1')
+. (Join-Path $PSScriptRoot 'Dashboard.ps1')
 function Say([string]$text,[bool]$failed=$false){$script:ui.Message.Text=$text;$script:ui.Message.Foreground=if($failed){'#B54559'}else{'#58677E'}}
 function Selected {if($script:ui.Instances.SelectedItem){return $script:ui.Instances.SelectedItem.Raw};return $null}
 function Begin-JobCommand($request){
- $readOnly=$request.action -in @('snapshot','history','models','setup-status')
+ $readOnly=$request.action -in @('snapshot','history','models','setup-status','usage','check-update')
  if($readOnly -and @($script:jobs|Where-Object {$_.Name -eq $request.name -and $_.Action -eq $request.action}).Count){return $false}
- if(-not $readOnly -and @($script:jobs|Where-Object {$_.Name -eq $request.name -and $_.Action -notin @('snapshot','history','models','setup-status')}).Count){Say '此实例的上一项操作仍在进行，请等待完成。';return $false}
+ if(-not $readOnly -and @($script:jobs|Where-Object {$_.Name -eq $request.name -and $_.Action -notin @('snapshot','history','models','setup-status','usage','check-update')}).Count){Say '此实例的上一项操作仍在进行，请等待完成。';return $false}
  $file=Join-Path $script:jobsDir (([Guid]::NewGuid().ToString('N'))+'.json')
  [IO.File]::WriteAllText($file,($request|ConvertTo-Json -Depth 10 -Compress),[Text.UTF8Encoding]::new($false))
  $start=[Diagnostics.ProcessStartInfo]::new();$start.FileName=$script:node
@@ -111,7 +131,7 @@ function Begin-JobCommand($request){
  $start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.RedirectStandardOutput=$true;$start.RedirectStandardError=$true
  $start.StandardOutputEncoding=[Text.UTF8Encoding]::new($false)
  $proc=[Diagnostics.Process]::Start($start)
- $job=[pscustomobject]@{Action=$request.action;Name=$request.name;Process=$proc;Output=$proc.StandardOutput.ReadToEndAsync();Error=$proc.StandardError.ReadToEndAsync();Started=[datetime]::UtcNow;QrWindow=$null;QrImage=$null;QrHint=$null;QrStamp=[datetime]::MinValue}
+ $job=[pscustomobject]@{Action=$request.action;Name=$request.name;UserFeedback=[bool]$request.user_feedback;Process=$proc;Output=$proc.StandardOutput.ReadToEndAsync();Error=$proc.StandardError.ReadToEndAsync();Started=[datetime]::UtcNow;QrWindow=$null;QrImage=$null;QrHint=$null;QrStamp=[datetime]::MinValue}
  [void]$script:jobs.Add($job)
  if(-not $readOnly){Say ('正在执行：'+$request.action+' · '+$request.name+'。窗口可以继续使用。')}
  if($request.action -eq 'connect'){Show-Qr $job}
@@ -172,6 +192,7 @@ function Update-Selection {
  Enable-Capabilities
 }
 function Apply-Snapshot($value){
+ $script:snapshotLoaded=$true
  $selected=if(Selected){(Selected).name}else{''};$script:rows=@($value.instances);$script:defaultPersona=$value.default_persona
  foreach($row in $script:rows){if($script:chatWindows.ContainsKey($row.name)){$entry=$script:chatWindows[$row.name];$entry.AssistantName=$row.persona.assistant_name;$entry.Window.Title='聊天 · '+$row.label+' ('+$row.name+')';$entry.Window.FindName('Heading').Text=$row.label+' · '+$row.persona.assistant_name}}
  $items=@(foreach($row in $script:rows){
@@ -204,6 +225,9 @@ $script:ui.Role.Add_SelectionChanged({Enable-Capabilities})
 $script:ui.Refresh.Add_Click({$script:lastRefresh=[datetime]::MinValue})
 $script:ui.Add.Add_Click({Add-User})
 $script:ui.Setup.Add_Click({Show-Setup})
+$script:ui.Update.Add_Click({Show-Update})
+$script:ui.UsageBucket.Add_SelectionChanged({Update-UsageView})
+$script:ui.RefreshUsage.Add_Click({if(Begin-JobCommand @{action='usage';name=''}){$script:ui.RefreshUsage.IsEnabled=$false;$script:ui.RefreshUsage.Content='正在读取…';$script:ui.UsageHint.Text='正在读取当前Codex账号额度…';$script:lastUsage=[datetime]::UtcNow}})
 $script:ui.Persona.Add_Click({Show-Persona})
 $script:ui.OpenChat.Add_Click({Show-Chat})
 $script:ui.Model.Add_SelectionChanged({if(-not $script:bindingModel){Update-Efforts $script:ui.Effort.SelectedItem}})
@@ -223,9 +247,16 @@ $script:timer.Add_Tick({
    [void]$script:jobs.Remove($job);$job.Process.Dispose()
    if(-not $result -or $result.status -eq 'error'){
     $code=if($result.code){$result.code}else{'LOCAL_OPERATION_FAILED'};$detail=if($script:errors.ContainsKey($code)){$script:errors[$code]}else{'操作未完成：'+$code}
-    if($job.Action -eq 'history' -and $script:chatWindows.ContainsKey($job.Name)){$script:chatWindows[$job.Name].Window.FindName('Hint').Text=$detail}else{Say $detail $true}
+    if($job.Action -eq 'history' -and $script:chatWindows.ContainsKey($job.Name)){$script:chatWindows[$job.Name].Window.FindName('Hint').Text=$detail}elseif($job.Action -eq 'setup-status'){
+     Complete-SetupCheck ([pscustomobject]@{ready=$false;prompt='';connection_error=$code;checked_at=[datetime]::UtcNow;bundled_node=$false;node_version='';client_verified=$false}) $job.UserFeedback
+    }elseif($job.Action -eq 'usage'){$script:ui.RefreshUsage.IsEnabled=$true;$script:ui.RefreshUsage.Content='刷新额度';$script:ui.UsageHint.Text='读取额度失败，请稍后刷新。';Say $detail $true
+    }elseif($job.Action -like '*update'){Fail-Update $detail}else{Say $detail $true}
    }elseif($job.Action -eq 'snapshot'){Apply-Snapshot $result
-   }elseif($job.Action -eq 'setup-status'){$script:setupState=$result;Update-SetupDialog;if(-not $result.ready -and -not $script:setupShown){Show-Setup}
+   }elseif($job.Action -eq 'setup-status'){Complete-SetupCheck $result $job.UserFeedback
+   }elseif($job.Action -eq 'usage'){Apply-Usage $result
+   }elseif($job.Action -eq 'check-update'){Apply-UpdateCheck $result
+   }elseif($job.Action -eq 'download-update'){Apply-UpdateDownload $result
+   }elseif($job.Action -eq 'install-update' -and $result.status -eq 'update_handoff'){if($script:updateDialog){$script:updateDialog.Close()};$script:window.Close();return
    }elseif($job.Action -eq 'history'){Apply-History $result
    }elseif($job.Action -eq 'models'){$script:catalog=@($result.models);Load-ModelChoice (Selected);Say ('已从客户端读取 '+$script:catalog.Count+' 个可用模型及各自推理强度。')
    }else{
@@ -236,12 +267,17 @@ $script:timer.Add_Tick({
     if($job.Action -eq 'create'){Begin-JobCommand @{action='connect';name=$job.Name}}
    }
   }
+  if($script:installPending){if(-not $script:jobs.Count){$script:installPending=$false;[void](Begin-JobCommand @{action='install-update';name='';version=$script:downloadState.version;manager_pid=$PID})};return}
+  if(@($script:jobs|Where-Object {$_.Action -eq 'install-update'}).Count){return}
   if(([datetime]::UtcNow-$script:lastRefresh).TotalSeconds -ge 4 -and -not @($script:jobs|Where-Object {$_.Action -eq 'snapshot'}).Count){$script:lastRefresh=[datetime]::UtcNow;Begin-JobCommand @{action='snapshot';name=''}}
   foreach($name in @($script:chatWindows.Keys)){$entry=$script:chatWindows[$name];if(([datetime]::UtcNow-$entry.LastRefresh).TotalSeconds -ge 4){$entry.LastRefresh=[datetime]::UtcNow;[void](Begin-JobCommand @{action='history';name=$name})}}
   if(-not $script:setupRequested){$script:setupRequested=$true;[void](Begin-JobCommand @{action='setup-status';name=''})}
+  if($script:snapshotLoaded -and $script:setupState -and -not $script:setupShown -and (-not $script:setupState.ready -or -not $script:rows.Count)){$script:setupShown=$true;[void]$script:window.Dispatcher.BeginInvoke([Action]{Show-Setup})}
+  if($script:setupVerifyRequested -and -not @($script:jobs|Where-Object {$_.Action -eq 'setup-status'}).Count){$script:setupVerifyRequested=$false;[void](Begin-JobCommand @{action='setup-status';name='';verify=$true;user_feedback=$true})}
   if($script:setupState.ready -and -not $script:modelsRequested){$script:modelsRequested=$true;Begin-JobCommand @{action='models';name=''}}
+  if($script:setupState.ready -and ([datetime]::UtcNow-$script:lastUsage).TotalMinutes -ge 5){$script:lastUsage=[datetime]::UtcNow;[void](Begin-JobCommand @{action='usage';name=''})}
  }catch{Say '界面更新异常，请刷新；服务进程保持原状态。' $true}
 })
 $script:window.Add_Closed({$script:timer.Stop()})
-if($SelfTest){$a=New-PersonaDialog;$b=New-ChatDialog;$c=New-SetupDialog;$a.Close();$b.Close();$c.Close();[Console]::WriteLine('WPF_LOAD_OK: manager, persona, chat, setup');exit 0}
+if($SelfTest){$a=New-PersonaDialog;$b=New-ChatDialog;$c=New-SetupDialog;$d=New-UpdateDialog;$a.Close();$b.Close();$c.Close();$d.Close();[Console]::WriteLine('WPF_LOAD_OK: manager, persona, chat, setup, update');exit 0}
 $script:timer.Start();[void]$script:window.ShowDialog()

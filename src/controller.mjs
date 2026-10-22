@@ -5,8 +5,11 @@ import {spawn} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {setupStatus} from './setup-status.mjs';
 import {instancePaths,instanceDataDirectory} from '../runtime/skills/wechat-dialog/scripts/instance-paths.mjs';
+import {normalizeUsage} from './account-usage.mjs';
+import {checkUpdate,downloadUpdate,verifyInstaller,updateDirectory} from './updates.mjs';
 
 export const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const {version:appVersion}=JSON.parse(await fs.readFile(path.join(appRoot,'package.json'),'utf8'));
 const profile=process.env.LOCALAPPDATA;
 const manager=path.join(profile,'Codex','wechat-manager');
 const runtime=path.join(appRoot,'runtime','skills');
@@ -59,19 +62,46 @@ export async function snapshot(){
   }catch(error){return {name,label:labels[name]||name,error:error.message,running:false,phase:'needs_attention'};}}));
   instances.sort((a,b)=>a.name==='primary'?-1:b.name==='primary'?1:a.name.localeCompare(b.name,undefined,{numeric:true}));
   const next=instances.length?Math.max(1,...instances.map(item=>Number(item.name.match(/^user-(\d+)$/)?.[1]||1)))+1:1;
-  return {status:'ok',version:'1.2.0',default_persona,notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
+  return {status:'ok',version:appVersion,default_persona,notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
+}
+async function installed(){const manifest=await json(path.join(appRoot,'install-manifest.json'));return !!(manifest?.platform==='windows-x64'&&manifest.version===appVersion&&await fs.access(path.join(appRoot,'unins000.exe')).then(()=>true,()=>false));}
+async function updateAction(input){
+ const update=await checkUpdate(appVersion);
+ if(input.action==='check-update')return {...update,installed:await installed()};
+ if(!update.available||update.latest_version!==input.version)throw Error('UPDATE_CHANGED_RECHECK');
+ const root=path.join(manager,'updates');
+ if(input.action==='download-update')return downloadUpdate(update,root);
+ if(!await installed())throw Error('UPDATE_INSTALLER_ONLY');
+ if(!Number.isSafeInteger(input.manager_pid)||input.manager_pid<=0)throw Error('UPDATE_MANAGER_INVALID');
+ const directory=await updateDirectory(root,update.latest_version),file=path.join(directory,update.asset.name);
+ await verifyInstaller(file,update.asset,root);
+ const instances=[];for(const item of (await snapshot()).instances){const c=await config(item.name),s=await current(c);if(s.running)instances.push({c,s});}
+ const processes=await run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(appRoot,'src','update-processes.ps1'),'-AppRoot',appRoot,'-ProcessIds',instances.map(item=>item.s.pid).join(',')]);
+ const owned=instances.filter(item=>processes.processes.some(proc=>proc.pid===item.s.pid&&proc.owned));
+ if(owned.some(item=>isBusy(item.s)))throw Error('INSTANCE_BUSY');
+ const stopped=[];let child;
+ try{
+  for(const item of owned){stopped.push(item.c.name);await stop(item.c,{requireIdle:true});}
+  const script=path.join(directory,'ApplyUpdate.ps1');await fs.copyFile(path.join(appRoot,'src','ApplyUpdate.ps1'),script);
+  const job=path.join(directory,randomBytes(16).toString('hex')+'.json'),jobs=path.join(manager,'jobs');await fs.mkdir(jobs,{recursive:true});
+  await fs.writeFile(job,JSON.stringify({installer:file,download_root:await fs.realpath(root),sha256:update.asset.sha256,bytes:update.asset.size,manager_pid:input.manager_pid,app_root:appRoot,resume_instances:stopped,jobs_directory:jobs}));
+  child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-JobFile',job],{cwd:directory,windowsHide:true,detached:true,stdio:'ignore'});let failed=false;child.on('error',()=>{failed=true;});
+  const deadline=Date.now()+10000;while(!failed&&Date.now()<deadline){if(await fs.access(job+'.ready').then(()=>true,()=>false)){child.unref();return {status:'update_handoff',version:update.latest_version};}if(await fs.access(job+'.error.json').then(()=>true,()=>false))break;await delay(100);}
+  throw Error('UPDATE_HANDOFF_FAILED');
+ }catch(error){if(child&&!child.killed)child.kill();for(const name of stopped){try{await invoke(await config(name),['start']);}catch{}}throw error;}
+}
+async function withClient(callback){
+ const {SecureStore,RpcClient}=await import(pathToFileURL(path.join(scripts,'core.mjs')));
+ let primary;try{primary=await config('primary');}catch(error){if(error.message!=='INSTANCE_NOT_REGISTERED')throw error;}
+ const state=await new SecureStore(primary?.data_directory||path.join(profile,'Codex','wechat-dialog'),path.join(scripts,'secure-store.ps1')).load()||{};
+ const environment={...await env(),...(state.providerEnv||{})};const executable=state.codex||environment.CODEX_CLI_PATH;if(!executable)throw Error('CODEX_PATH_REQUIRED');
+ const rpc=new RpcClient(executable,environment);try{await rpc.initialize();return await callback(rpc);}finally{rpc.close();}
 }
 export async function catalog({refresh=false}={}){
  const file=path.join(manager,'model-catalog.json');const cached=await json(file);
  if(!refresh&&cached&&Date.now()-Date.parse(cached.retrieved_at)<300000)return cached;
- const {SecureStore,RpcClient}=await import(pathToFileURL(path.join(scripts,'core.mjs')));
  const {normalizeCatalog}=await import(pathToFileURL(path.join(scripts,'model-policy.mjs')));
- let primary;try{primary=await config('primary');}catch(error){if(error.message!=='INSTANCE_NOT_REGISTERED')throw error;}
- const state=await new SecureStore(primary?.data_directory||path.join(profile,'Codex','wechat-dialog'),path.join(scripts,'secure-store.ps1')).load()||{};
- const environment={...await env(),...(state.providerEnv||{})};const executable=state.codex||environment.CODEX_CLI_PATH;if(!executable)throw Error('CODEX_PATH_REQUIRED');
- const rpc=new RpcClient(executable,environment);let items=[],cursor;
- try{await rpc.initialize();for(let page=0;page<20;page++){const result=await rpc.request('model/list',{includeHidden:false,limit:100,...(cursor?{cursor}:{})},45000);items.push(...result.data);if(!result.nextCursor){cursor=null;break;}if(result.nextCursor===cursor)throw Error('MODEL_LIST_INCOMPLETE');cursor=result.nextCursor;}if(cursor)throw Error('MODEL_LIST_INCOMPLETE');}
- finally{rpc.close();}
+ const items=await withClient(async rpc=>{const items=[];let cursor;for(let page=0;page<20;page++){const result=await rpc.request('model/list',{includeHidden:false,limit:100,...(cursor?{cursor}:{})},45000);items.push(...result.data);if(!result.nextCursor){cursor=null;break;}if(result.nextCursor===cursor)throw Error('MODEL_LIST_INCOMPLETE');cursor=result.nextCursor;}if(cursor)throw Error('MODEL_LIST_INCOMPLETE');return items;});
  const models=normalizeCatalog(items);if(!models.length)throw Error('MODEL_LIST_EMPTY');const result={status:'models',source:'codex-model-list',retrieved_at:new Date().toISOString(),models};
  await fs.mkdir(manager,{recursive:true});const tmp=file+'.'+randomBytes(6).toString('hex')+'.tmp';await fs.writeFile(tmp,JSON.stringify(result,null,2));await fs.rename(tmp,file);return result;
 }
@@ -91,7 +121,12 @@ async function create(input){
 export async function execute(input){
   if(!input||typeof input!=='object')throw Error('INVALID_REQUEST');
   if(input.action==='snapshot')return snapshot();
-  if(input.action==='setup-status')return setupStatus(appRoot,await env());
+  if(['check-update','download-update','install-update'].includes(input.action))return updateAction(input);
+  if(input.action==='setup-status')return setupStatus(appRoot,await env(),{verifyClient:input.verify?()=>withClient(rpc=>rpc.request('model/list',{includeHidden:false,limit:1},20000)):null});
+  if(input.action==='usage'){
+    try{return normalizeUsage(await withClient(rpc=>rpc.request('account/rateLimits/read',{},20000)));}
+    catch(error){return {...normalizeUsage(null),reason:error.message==='CODEX_PATH_REQUIRED'?'CLIENT_CONNECTION_REQUIRED':'ACCOUNT_USAGE_UNAVAILABLE'};}
+  }
   if(input.action==='models')return catalog({refresh:true});
   if(input.action==='create'){if(!(await setupStatus(appRoot,await env())).ready)throw Error('CLIENT_CONNECTION_REQUIRED');return create(input);}
   const c=await config(input.name);
