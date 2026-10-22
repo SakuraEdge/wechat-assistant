@@ -1,22 +1,28 @@
 ﻿function Reset-Time($value){if(-not $value){return '未提供'};try{return ([datetime]$value).ToLocalTime().ToString('yyyy-MM-dd HH:mm:ss zzz')}catch{return '未提供'}}
-function Usage-Text($value){
- if(-not $value -or $null -eq $value.remaining_percent){return '当前账号未提供此额度'}
- return ('剩余 {0:0.#}%　·　已用 {1:0.#}%' -f $value.remaining_percent,$value.used_percent)
+function Quota-ResetLabel($value){
+ if(-not $value){return '重置：未提供'}
+ try{$time=([datetime]$value).ToLocalTime();return $(if($time.Date -eq [datetime]::Now.Date){'今日 '+$time.ToString('HH:mm')+' 重置'}else{$time.ToString('MM月dd日 HH:mm')+' 重置'})}catch{return '重置：未提供'}
 }
 function Update-UsageView {
  $bucket=$script:ui.UsageBucket.SelectedItem
  foreach($pair in @(@('Five','five_hour'),@('Week','weekly'))){
   $value=if($bucket){$bucket.($pair[1])}else{$null}
-  $script:ui[$pair[0]+'Usage'].Text=Usage-Text $value
-  $script:ui[$pair[0]+'Reset'].Text='重置：'+$(if($value){Reset-Time $value.resets_at}else{'未提供'})
-  $script:ui[$pair[0]+'Progress'].Value=if($value -and $null -ne $value.remaining_percent){$value.remaining_percent}else{0}
-  $script:ui[$pair[0]+'Progress'].Opacity=if($value -and $null -ne $value.remaining_percent){1}else{0.25}
+  $known=$value -and $null -ne $value.remaining_percent
+  $script:ui[$pair[0]+'Usage'].Text=if($known){'{0:0.#}%' -f $value.remaining_percent}else{'—'}
+  $script:ui[$pair[0]+'Caption'].Text=if($known){'剩余'}else{'未提供'}
+  $script:ui[$pair[0]+'Used'].Text=if($known -and $null -ne $value.used_percent){'已用 {0:0.#}%' -f $value.used_percent}else{'已用：未提供'}
+  $script:ui[$pair[0]+'Reset'].Text=Quota-ResetLabel $(if($value){$value.resets_at}else{$null})
+  $script:ui[$pair[0]+'Reset'].ToolTip='重置：'+$(if($value){Reset-Time $value.resets_at}else{'未提供'})
+  $script:ui[$pair[0]+'Progress'].Value=if($known -and $null -ne $value.used_percent){$value.used_percent}else{0}
+  $script:ui[$pair[0]+'Progress'].Opacity=if($known -and $null -ne $value.used_percent){1}else{0.25}
  }
 }
 function Apply-Usage($result){
  $selected=$script:ui.UsageBucket.SelectedValue;$script:usageState=$result
- $script:ui.UsageBucket.ItemsSource=@($result.buckets)
- $target=if(@($result.buckets|Where-Object {$_.id -eq $selected}).Count){$selected}else{$result.preferred_id}
+ $buckets=@($result.buckets|Where-Object {$null -ne $_})
+ $script:ui.UsageBucket.ItemsSource=$buckets
+ $script:ui.UsageBucket.Visibility=if($buckets.Count -gt 1){'Visible'}else{'Collapsed'}
+ $target=if(@($buckets|Where-Object {$_.id -eq $selected}).Count){$selected}else{$result.preferred_id}
  $script:ui.UsageBucket.SelectedValue=$target;Update-UsageView
  $time=([datetime]$result.at).ToLocalTime().ToString('HH:mm:ss')
  $script:ui.UsageHint.Text=if($result.available){'当前Codex账号共享额度 · 本机时间 · 更新于 '+$time}else{'当前账号或提供商暂未提供可读取的额度 · '+$time+' · 可稍后刷新'}
@@ -24,7 +30,7 @@ function Apply-Usage($result){
 }
 function New-UpdateDialog {
  return Read-Dialog @'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="检测更新" Width="650" Height="440" MinWidth="600" MinHeight="400" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F3F5F7"><Grid Margin="26"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock Text="ClawBot实例管理器 · 软件更新" FontSize="22" FontWeight="SemiBold" Foreground="#172033"/><Border Grid.Row="1" Background="#E9F2F0" CornerRadius="8" Padding="15" Margin="0,18,0,14"><TextBlock Name="UpdateHint" Text="正在检查GitHub正式版本，请稍候…" TextWrapping="Wrap" LineHeight="24" Foreground="#285B52"/></Border><TextBlock Grid.Row="2" Name="UpdateDetails" Text="仅检查 SakuraEdge/wechat-assistant 的正式Release。下载后核对大小与SHA-256，点击安装才会执行安装程序。&#10;&#10;安装版：将停止此安装目录的空闲服务并关闭管理窗口，安装完成后恢复服务。忙碌时请等待任务完成。&#10;&#10;源码/便携版：可下载安装包，在独立安装目录使用，保留原目录。" TextWrapping="Wrap" LineHeight="24" Foreground="#64748B"/><WrapPanel Grid.Row="3" Margin="0,15,0,0"><Button Name="CheckUpdateAgain" Content="重新检测" Padding="12,9" Margin="0,0,8,0"/><Button Name="DownloadUpdate" Content="下载更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="InstallUpdate" Content="安装更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0" Background="#0F766E" BorderBrush="#0F766E" Foreground="White"/><Button Name="OpenDownload" Content="打开下载目录" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="CloseUpdate" Content="关闭" Padding="12,9"/></WrapPanel></Grid></Window>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="检测更新" Width="650" Height="440" MinWidth="600" MinHeight="400" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F8F9FC"><Grid Margin="26"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock Text="ClawBot实例管理器 · 软件更新" FontSize="22" FontWeight="SemiBold" Foreground="#242636"/><Border Grid.Row="1" Background="#F0EDFA" CornerRadius="8" Padding="15" Margin="0,18,0,14"><TextBlock Name="UpdateHint" Text="正在检查GitHub正式版本，请稍候…" TextWrapping="Wrap" LineHeight="24" Foreground="#66578E"/></Border><TextBlock Grid.Row="2" Name="UpdateDetails" Text="仅检查 SakuraEdge/wechat-assistant 的正式Release。下载后核对大小与SHA-256，点击安装才会执行安装程序。&#10;&#10;安装版：将停止此安装目录的空闲服务并关闭管理窗口，安装完成后恢复服务。忙碌时请等待任务完成。&#10;&#10;源码/便携版：可下载安装包，在独立安装目录使用，保留原目录。" TextWrapping="Wrap" LineHeight="24" Foreground="#64748B"/><WrapPanel Grid.Row="3" Margin="0,15,0,0"><Button Name="CheckUpdateAgain" Content="重新检测" Padding="12,9" Margin="0,0,8,0"/><Button Name="DownloadUpdate" Content="下载更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="InstallUpdate" Content="安装更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0" Background="#7864DC" BorderBrush="#7864DC" Foreground="White"/><Button Name="OpenDownload" Content="打开下载目录" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="CloseUpdate" Content="关闭" Padding="12,9"/></WrapPanel></Grid></Window>
 '@
 }
 function Update-Hint([string]$text){Say $text;if($script:updateDialog -and $script:updateDialog.IsVisible){$script:updateDialog.FindName('UpdateHint').Text=$text}}
