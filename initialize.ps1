@@ -15,5 +15,5 @@ if(-not(Test-Path -LiteralPath (Join-Path $skill 'node_modules\qrcode'))){
 if($LASTEXITCODE -ne 0){throw 'Desktop connection initialization failed'}
 & $node (Join-Path $PSScriptRoot 'tools\install-skills.mjs')
 if($LASTEXITCODE -ne 0){throw 'Skill entry installation failed'}
-if(-not(Test-Path -LiteralPath (Join-Path $PSScriptRoot '微信助手.exe'))){& (Join-Path $PSScriptRoot 'build.ps1')}
-if(-not $NoLaunch){Start-Process -FilePath (Join-Path $PSScriptRoot '微信助手.exe') -WindowStyle Normal}
+if(-not(Test-Path -LiteralPath (Join-Path $PSScriptRoot 'ClawBot实例管理器.exe'))){& (Join-Path $PSScriptRoot 'build.ps1')}
+if(-not $NoLaunch){Start-Process -FilePath (Join-Path $PSScriptRoot 'ClawBot实例管理器.exe') -WindowStyle Normal}

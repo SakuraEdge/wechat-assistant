@@ -44,16 +44,20 @@ async function stop(c,{requireIdle=false}={}){
 }
 async function prepare(c){const s=await current(c);if(s.configured)return;if(s.running)throw Error('INSTANCE_BUSY');await manage('Prepare',c.name);}
 export async function snapshot(){
+  const {DEFAULT_PERSONA}=await import(pathToFileURL(path.join(scripts,'persona-profile.mjs')));
+  const default_persona={...DEFAULT_PERSONA,references:['gpt-dragon.png','fish-cosplay.png'].map((file,i)=>({path:path.join(appRoot,'templates','workspace','outputs','persona','references',file),label:i?'大肥鱼（cosplay）':'GPT小姐（本体）'}))};
   let names;try{names=(await fs.readdir(registry)).filter(name=>/^[a-z][a-z0-9-]{0,47}\.json$/.test(name));}catch(error){if(error.code==='ENOENT')names=[];else throw error;}
   const labels=await json(path.join(manager,'labels.json'),{});const {loadAccessPolicy}=await modules();
   const instances=await Promise.all(names.map(async file=>{const name=file.slice(0,-5);try{
     const c=await config(name),s=await current(c);const policy=await loadAccessPolicy(c.data_directory,name);
     const {loadModelPolicy}=await import(pathToFileURL(path.join(scripts,'model-policy.mjs')));const selection=await loadModelPolicy(c.data_directory);
-    return {name,label:labels[name]||name,workspace:c.workspace,data_directory:c.data_directory,configured:!!s.configured,logged_in:!!s.logged_in,running:s.running,phase:s.phase||'unprepared',busy:isBusy(s),reply_ready:!!s.reply_ready,thread_id:s.thread_id||null,policy,last_received_at:s.last_received_at||s.last_chat?.at||null,last_work_finished_at:s.last_work_finished_at||null,queued:s.queued||0,updated_at:s.updated_at||null,project_tools_connected:!!s.project_tools_connected,model:selection.model,reasoning_effort:selection.effort,effective_model:s.model||null,effective_effort:s.reasoning_effort??null,account_fingerprint:s.account_fingerprint||null};
+    const {loadPersona}=await import(pathToFileURL(path.join(scripts,'persona-profile.mjs')));
+    const persona=await loadPersona(c.data_directory,c.workspace,{displayName:labels[name]||name,referenceDir:path.join(appRoot,'templates','workspace','outputs','persona','references')});
+    return {name,label:persona.display_name,persona,workspace:c.workspace,data_directory:c.data_directory,configured:!!s.configured,logged_in:!!s.logged_in,running:s.running,phase:s.phase||'unprepared',busy:isBusy(s),reply_ready:!!s.reply_ready,thread_id:s.thread_id||null,policy,last_received_at:s.last_received_at||s.last_chat?.at||null,last_work_finished_at:s.last_work_finished_at||null,queued:s.queued||0,updated_at:s.updated_at||null,project_tools_connected:!!s.project_tools_connected,model:selection.model,reasoning_effort:selection.effort,effective_model:s.model||null,effective_effort:s.reasoning_effort??null,account_fingerprint:s.account_fingerprint||null};
   }catch(error){return {name,label:labels[name]||name,error:error.message,running:false,phase:'needs_attention'};}}));
   instances.sort((a,b)=>a.name==='primary'?-1:b.name==='primary'?1:a.name.localeCompare(b.name,undefined,{numeric:true}));
   const next=instances.length?Math.max(1,...instances.map(item=>Number(item.name.match(/^user-(\d+)$/)?.[1]||1)))+1:1;
-  return {status:'ok',version:'1.0.0',notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
+  return {status:'ok',version:'1.1.0',default_persona,notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
 }
 export async function catalog({refresh=false}={}){
  const file=path.join(manager,'model-catalog.json');const cached=await json(file);
@@ -87,6 +91,26 @@ export async function execute(input){
   if(input.action==='models')return catalog({refresh:true});
   if(input.action==='create')return create(input);
   const c=await config(input.name);
+  if(input.action==='history'){
+    const {SecureStore}=await import(pathToFileURL(path.join(scripts,'core.mjs')));
+    const {exportConversation}=await import(pathToFileURL(path.join(scripts,'conversation-log.mjs')));
+    const state=await new SecureStore(c.data_directory,path.join(scripts,'secure-store.ps1')).load()||{};
+    const result=exportConversation(state);
+    for(const item of result.messages)for(const secret of [state.credentials?.bot_token,...Object.values(state.providerEnv||{}).filter((_,index)=>/KEY|TOKEN|SECRET|PASSWORD/i.test(Object.keys(state.providerEnv||{})[index]))])if(typeof secret==='string'&&secret.length>5)item.text=item.text.replaceAll(secret,'[已隐藏]');
+    return {status:'history',name:c.name,...result,at:new Date().toISOString()};
+  }
+  if(input.action==='persona-default'){
+    const {DEFAULT_PERSONA}=await import(pathToFileURL(path.join(scripts,'persona-profile.mjs')));
+    return {status:'persona_default',...DEFAULT_PERSONA,references:['gpt-dragon.png','fish-cosplay.png'].map((file,i)=>({path:path.join(appRoot,'templates','workspace','outputs','persona','references',file),label:i?'大肥鱼（cosplay）':'GPT小姐（本体）'}))};
+  }
+  if(input.action==='persona'){
+    const {preparePersona,savePersona}=await import(pathToFileURL(path.join(scripts,'persona-profile.mjs')));
+    const prepared=await preparePersona(input);const s=await current(c);if(isBusy(s))throw Error('INSTANCE_BUSY');
+    await stop(c,{requireIdle:true});
+    try{await savePersona(c.data_directory,prepared,{defaultReferenceDir:path.join(appRoot,'templates','workspace','outputs','persona','references')});}
+    finally{if(s.running){await invoke(c,['start']);await waitFor(c,value=>value.running);}}
+    return {status:'persona_saved',name:c.name,restarted:s.running};
+  }
   if(input.action==='start'){await prepare(c);const value=await invoke(c,['start']);await waitFor(c,s=>s.running);return value;}
   if(input.action==='stop')return stop(c);
   if(input.action==='restart'){await stop(c,{requireIdle:true});await invoke(c,['start']);await waitFor(c,s=>s.running);return {status:'restarted'};}

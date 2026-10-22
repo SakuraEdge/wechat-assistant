@@ -32,13 +32,16 @@ export const entryIntent = (entry, state = {}) => entry.intent || classifyMessag
 export const isPendingEntry = entry => ['queued','running','chatting','receiving'].includes(entry.status);
 export function localChatReply(text = '', state = {}) {
   const value = text.replace(/^\/聊天\s*/, '').trim().replace(/[～~！!。.?？\s]+$/g, '');
-  if (/^(你好|您好|嗨|哈喽|hello|hi)$/i.test(value)) return '你好呀～GPT 小姐在呢。🐉';
+  const name=state.persona?.assistant_name||'GPT小姐',custom=state.persona&&state.persona.builtin_appearance===false;
+  // Custom speech styles are handled by the tool-free chat model; never apply the old persona's canned lines.
+  if(custom&&!/^(进度怎么样|怎么样了|做到哪了|还在处理吗|任务还在运行吗)$/.test(value))return null;
+  if (/^(你好|您好|嗨|哈喽|hello|hi)$/i.test(value)) return '你好呀～'+name+'在呢。🐉';
   if (/^(在吗|在不在|你在吗|人呢|在嘛)$/.test(value)) return '在呢～你说，我听着。🐉';
   if (/^(谢谢|谢谢你|谢谢啦|谢啦|感谢|辛苦了)$/.test(value)) return '不客气～🐉';
   if (/^(晚安|睡啦|睡觉了)$/.test(value)) return '晚安～好好休息，明天见。🌙';
   if (/^(早|早安|早上好)$/.test(value)) return '早呀～今天也一起加油。🐉';
   if (/^(好的|好|嗯|嗯嗯|知道了|收到|ok)$/i.test(value)) return '嗯嗯～🐉';
-  if (/^(你是谁|你是什么|你叫什么)$/.test(value)) return '我是 GPT 小姐，白发龙娘一只，偶尔会 cosplay 成蓝色大肥鱼～🐉';
+  if (/^(你是谁|你是什么|你叫什么)$/.test(value)) return '我是'+name+'，白发龙娘一只，偶尔会 cosplay 成蓝色大肥鱼～🐉';
   if (/^(你能做什么|你会什么|你可以做什么|你能帮我做什么)$/.test(value)) return '可以陪你聊天，也能帮你写代码、处理文件和图片、查资料、管理这台电脑上的任务。直接告诉我想做什么就好～🐉';
   if (/^(你能接收图片吗|你可以接收图片吗|可以发图片给你吗)$/.test(value)) return '可以呀～直接把图片发到这个 ClawBot 对话里，我就能看。🐉';
   if (/^(你能接收文件吗|你可以接收文件吗|可以发文件给你吗|你能发文件吗|你可以发文件吗)$/.test(value)) return '可以呀～你可以直接上传文件，再告诉我要怎么处理；需要结果文件时，说“处理后把文件发回来”就好。🐉';

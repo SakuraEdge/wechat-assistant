@@ -1,9 +1,15 @@
 {
   "name": "wechat-assistant-manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "description": "Windows desktop manager for the existing Codex WeChat assistant",
-  "scripts": {"sync": "node tools/sync-runtime.mjs", "audit": "node tools/audit-package.mjs", "test": "node --test tests/*.test.mjs"},
-  "engines": {"node": ">=24"}
+  "description": "ClawBot实例管理器：Windows 微信多实例、人设、模型与聊天管理",
+  "scripts": {
+    "sync": "node tools/sync-runtime.mjs",
+    "audit": "node tools/audit-package.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  }
 }

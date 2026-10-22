@@ -17,6 +17,8 @@ import {ACCESS_POLICY_VERSION,loadAccessPolicy,policyFor,deniedRequest} from './
 import {desktopEnvironment} from './desktop-connection.mjs';
 import {enqueueDesktopCommand,drainDesktopCommands} from './manager-commands.mjs';
 import {loadModelPolicy,modelFor,MODEL_POLICY_VERSION} from './model-policy.mjs';
+import {runtimePersona,PERSONA_VERSION} from './persona-profile.mjs';
+import {observeOutgoing} from './conversation-log.mjs';
 import { downloadIncomingImage, validateLocalImage, uploadWechatImage } from './media.mjs';
 import { WechatApi, SecureStore, RpcClient, agentTurn, ingest, sleep, splitText, digest, checkedBase, WECHAT_PERMISSIONS, WECHAT_MODEL, WECHAT_THREAD_MODEL, confirmWechatPermissions, resumeWechatThread, acknowledgeEntry, isControlMessage } from './core.mjs';
 
@@ -274,12 +276,13 @@ async function run() {
   if (!state?.credentials) throw new Error('WECHAT_LOGIN_REQUIRED');
   state.accessPolicy=await loadAccessPolicy(dataDir,state.instanceId||'primary');
   state.modelSelection=await loadModelPolicy(dataDir);
+  state.persona=await runtimePersona(dataDir,state.cwd);
   await fs.mkdir(dataDir, { recursive: true });
   try { const lock = JSON.parse(await fs.readFile(lockFile, 'utf8')); if (alive(lock.pid)) throw new Error('WORKER_ALREADY_RUNNING'); await fs.unlink(lockFile); }
   catch (error) { if (safeError(error) === 'WORKER_ALREADY_RUNNING') throw error; }
   const handle = await fs.open(lockFile, 'wx');
   await handle.writeFile(JSON.stringify({ pid: process.pid })); await handle.close();
-  const api = new WechatApi(state.credentials);
+  const api = observeOutgoing(new WechatApi(state.credentials),state);
   const rpc = new RpcClient(state.codex, persistedEnv(state),undefined,{appTools:true});
   rpc.projectConfig=await loadProjectToolConfig(process.env,policyFor(state));
   let running = true; let busy = false; let chatBusy = false; let attachmentBusy = false; let unhealthy = false; let outboxBusy = false;
@@ -290,7 +293,7 @@ async function run() {
   let chatController; let progress; let nativeChat;
   const approvals = new Map();
   const persist = () => store.save(state);
-  const meta = phase => publicMeta({ configured: true, logged_in: true, running, pid: process.pid, phase, reply_ready: !!state.context, queued: state.pending.filter(e => e.status === 'queued').length, instance: state.instanceId || 'primary', workspace: state.cwd, data_directory: dataDir, model: modelFor(state).model, reasoning_effort: modelFor(state).effort, model_policy_version: MODEL_POLICY_VERSION, ...(rpc.wechatPermissions || { permissions_verified: false }), last_ack_at: state.lastAckAt || null, ack_sticker_version: ACK_STICKER_VERSION, last_ack_sticker_at: state.lastAckImageAt || null, thread_recovered: !!rpc.threadRecovered, routing_version: ROUTING_VERSION, chat_busy: chatBusy, last_chat: state.lastChat || null, last_work_finished_at: state.lastWorkResult?.at || null, file_transfer_version: FILE_TRANSFER_VERSION, max_file_bytes: MAX_FILE_BYTES, attachment_busy: attachmentBusy, last_file_received_at: state.lastFileReceivedAt || null, last_file_sent_at: state.lastFileSentAt || null, received_file_count: state.receivedFileCount || 0, sent_file_count: state.sentFileCount || 0, thread_id: state.threadId, account_fingerprint: digest(state.credentials.ilink_user_id).slice(0,8), access_policy_version: ACCESS_POLICY_VERSION, access_policy: policyFor(state), last_received_at: state.lastReceivedAt || null, question_broker_version: QUESTION_BROKER_VERSION, project_bridge_version: PROJECT_BRIDGE_VERSION, project_tools_connected: !!rpc.projectToolsConnected });
+  const meta = phase => publicMeta({ configured: true, logged_in: true, running, pid: process.pid, phase, reply_ready: !!state.context, queued: state.pending.filter(e => e.status === 'queued').length, instance: state.instanceId || 'primary', workspace: state.cwd, data_directory: dataDir, model: modelFor(state).model, reasoning_effort: modelFor(state).effort, model_policy_version: MODEL_POLICY_VERSION, persona_version:PERSONA_VERSION, assistant_name:state.persona.assistant_name, ...(rpc.wechatPermissions || { permissions_verified: false }), last_ack_at: state.lastAckAt || null, ack_sticker_version: ACK_STICKER_VERSION, last_ack_sticker_at: state.lastAckImageAt || null, thread_recovered: !!rpc.threadRecovered, routing_version: ROUTING_VERSION, chat_busy: chatBusy, last_chat: state.lastChat || null, last_work_finished_at: state.lastWorkResult?.at || null, file_transfer_version: FILE_TRANSFER_VERSION, max_file_bytes: MAX_FILE_BYTES, attachment_busy: attachmentBusy, last_file_received_at: state.lastFileReceivedAt || null, last_file_sent_at: state.lastFileSentAt || null, received_file_count: state.receivedFileCount || 0, sent_file_count: state.sentFileCount || 0, thread_id: state.threadId, account_fingerprint: digest(state.credentials.ilink_user_id).slice(0,8), access_policy_version: ACCESS_POLICY_VERSION, access_policy: policyFor(state), last_received_at: state.lastReceivedAt || null, question_broker_version: QUESTION_BROKER_VERSION, project_bridge_version: PROJECT_BRIDGE_VERSION, project_tools_connected: !!rpc.projectToolsConnected });
   const log = status => output({ time: new Date().toISOString(), status });
   const redact = value => {
     let text = String(value || '');

@@ -1,6 +1,7 @@
 import { RpcClient } from './core.mjs';
 import {DEFAULT_MODEL,modelFor} from './model-policy.mjs';
-const INSTRUCTIONS = '你是GPT小姐，白发紫瞳、双龙角的龙娘，偶尔cosplay蓝色鲸鱼娘。这里只进行日常聊天：默认中文，温柔机灵，直接用一两句自然回复，少量emoji。绝对不要调用任何工具、skill或协作模型，不读文件、不查资料、不执行任务，不发收到、正在处理或排队回执，不输出任务计划或进度。能力询问直接解释，未明确安排工作时不要动手。不确定的事实直说不知道。历史摘要仅供回指。';
+import {personaInstructions} from './persona-profile.mjs';
+const INSTRUCTIONS = '这里只进行日常聊天：默认中文，温柔机灵，直接用一两句自然回复，少量emoji。绝对不要调用任何工具、skill或协作模型，不读文件、不查资料、不执行任务，不发收到、正在处理或排队回执，不输出任务计划或进度。能力询问直接解释，未明确安排工作时不要动手。不确定的事实直说不知道。历史摘要仅供回指。';
 export function chatOnlyConfig(config = {},selection=DEFAULT_MODEL) {
   return { model_reasoning_effort:selection.effort, project_doc_max_bytes:0, web_search:'disabled', agents:{enabled:false},
     features:{shell_tool:false,shell_snapshot:false,apps:false,browser_use:false,computer_use:false,image_generation:false,view_image:false,skill_search:false,skip_host_skill_discovery:true,goals:false,sleep_tool:false,hooks:false,code_mode_host:false},
@@ -15,7 +16,7 @@ export class NativeChat {
   async warmup() {
     await this.ready;if(this.threadId&&this.turns<12)return;
     if(this.warming)return this.warming;
-    this.warming=(async()=>{const result=await this.rpc.request('thread/start',{cwd:this.state.cwd,model:this.model.model,ephemeral:true,approvalPolicy:'on-request',approvalsReviewer:'user',sandbox:'read-only',baseInstructions:INSTRUCTIONS,developerInstructions:'只聊天，不调用任何工具。当前模型='+this.model.model+'；推理强度='+(this.model.effort||'不适用')+'。',config:this.config});
+    this.warming=(async()=>{const result=await this.rpc.request('thread/start',{cwd:this.state.cwd,model:this.model.model,ephemeral:true,approvalPolicy:'on-request',approvalsReviewer:'user',sandbox:'read-only',baseInstructions:personaInstructions(this.state)+INSTRUCTIONS,developerInstructions:'只聊天，不调用任何工具。当前模型='+this.model.model+'；推理强度='+(this.model.effort||'不适用')+'。',config:this.config});
       this.threadId=result.thread.id;this.turns=0;this.settings={model:result.model,reasoning_effort:result.reasoningEffort,instruction_sources:(result.instructionSources||[]).length};})();
     try{await this.warming;}finally{this.warming=null;}
   }

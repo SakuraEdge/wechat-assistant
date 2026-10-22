@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { uploadWechatImage } from './media.mjs';
+import {recordMessage} from './conversation-log.mjs';
 
 export const ACK_STICKER_VERSION = 'persona-sticker-ack-v1';
 const inFlight = new WeakMap();
@@ -33,6 +34,7 @@ async function selectSticker(cwd, queued) {
 }
 
 export async function sendAckSticker(api, state, entry, queued, persist, options = {}) {
+  if(state.persona?.builtin_appearance===false)return;
   if (inFlight.has(entry)) return inFlight.get(entry);
   if (entry.ack?.status !== 'sent' || entry.ack.image_status) return;
   entry.ack.image_status = 'preparing';
@@ -59,6 +61,7 @@ export async function sendAckSticker(api, state, entry, queued, persist, options
       await persist();
       attempted = true;
       await api.sendItems(state.credentials.ilink_user_id, entry.context, [cached.item], entry.ack.image_client_id);
+      recordMessage(state,{id:'out-'+entry.ack.image_client_id,role:'assistant',text:'[工作回执表情图]',at:new Date().toISOString(),delivery:'sent',attachments:[{kind:'image',name:'工作回执表情图.png'}]});
       entry.ack.image_status = 'sent';
       state.lastAckImageAt = new Date(now).toISOString();
     } catch (error) {

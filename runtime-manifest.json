@@ -1,13 +1,13 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "files": [
     {
       "path": "docs/FEATURES.md",
-      "sha256": "f8105ef9abbffedb99df4bf31c275e1869cbaaf67bc460026c38c1e08ce8b83f"
+      "sha256": "0ec96f70a9505fa7a66bd76113f66208673cdd87ec0a1927bb4db0628d9caa04"
     },
     {
       "path": "docs/OPERATIONS.md",
-      "sha256": "146b44e0122aba4255f6633b6edf827a56ea105ee3e775ddf63dc045fbc8ae93"
+      "sha256": "e72cac371dce5e921199f2a3810c6e89d6d74d30d397fc4af3e674ba818c7986"
     },
     {
       "path": "runtime/skills/wechat-dialog/package-lock.json",
@@ -23,11 +23,15 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/ack-stickers.mjs",
-      "sha256": "31473cb622ddcefacc4c63d460a43cb8bdea02c3448976ea0c88ee30950f0213"
+      "sha256": "876a063c8f446fe1b9dfc83e9e522dbea292e300031961d0ac47ccc07b7b8b96"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/conversation-log.mjs",
+      "sha256": "583c0ea3a786caaf0a8b656adc9bc3b69df2a70b67006342f44cad16ebb5f21e"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/core.mjs",
-      "sha256": "0169eaea92ef771a1a98c87ffbf2b77cbe8556bb4e9ad7b93f435e7ea649d8d7"
+      "sha256": "13485b1236171241c1f9b5f4d889fde068e08a58f87e1449f1b2dbb1370c813a"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/desktop-connection.mjs",
@@ -55,7 +59,7 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/message-routing.mjs",
-      "sha256": "244edc0e43c0e087480e0ea175272661c13364661586362a1bb4c3d9827e7989"
+      "sha256": "6524fc4f137df136558eca45add1b2bddef2a48259a0f74f3997cbbb451e986e"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/model-policy.mjs",
@@ -63,7 +67,11 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/native-chat.mjs",
-      "sha256": "74eecfeb3f5249635a11974600fb702d259329eb520c41cbb3e5db8d72747734"
+      "sha256": "4993a8971c226dbfb3529162b225acd682663cfc3a5c79fbbd34de031cb87b25"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/persona-profile.mjs",
+      "sha256": "02d4ff34712adc1428547ef573dd363dd49cdab2ab62ddc07dce8d559d576c70"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/project-bridge.mjs",
@@ -79,7 +87,7 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-bot.mjs",
-      "sha256": "30dcb9a745b32c553161e08c17586919c941f0861f51e6989a95a0d0af7fb03d"
+      "sha256": "e95cd73890db90b78398332dc603b18ccae5f4e8579ef1f6546777006f071c06"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-instance.ps1",
@@ -95,7 +103,7 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/SKILL.md",
-      "sha256": "279856ab462179445c8f6a6046d8bd7a8969cd2333ff7c2c436e7336ce7b7b90"
+      "sha256": "e17bcffa6013eb15a14eca5ea7fa258a35a62cdd8746473c79387da1c39835ca"
     },
     {
       "path": "runtime/skills/wechat-notify/scripts/primary-bridge.ps1",
@@ -156,6 +164,10 @@
     {
       "path": "tests/model-policy.test.mjs",
       "sha256": "64d9ef1743eeddf5be70db4d6793a7bdca025c12ef8b4719f8da32d31646fa3d"
+    },
+    {
+      "path": "tests/persona-conversation.test.mjs",
+      "sha256": "77b9ba15d31da38b19ec3092ea2be7f8049c1e1935ccd0523235e1ea887c3a47"
     }
   ]
 }
