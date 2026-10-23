@@ -84,4 +84,10 @@ try{
  Apply-DownloadProgress ([pscustomobject]@{status='update_progress';phase='verifying';received_bytes=10485760;total_bytes=10485760;percent=99.9})
  $script:updateDialog.Show();Apply-DownloadProgress $script:downloadProgress
  if($script:updateDialog.FindName('DownloadStage').Text -notlike '*SHA-256*' -or $script:updateDialog.FindName('InstallUpdate').IsEnabled){throw 'DOWNLOAD_VERIFICATION_VIEW_FAILED'}
+ $plan=[pscustomobject]@{available=$true;current_version='1.4.0';latest_version='1.4.1';can_install=$true;installed=$false;install_reason=$null;install_directory='C:\Programs\ClawBotInstanceManager';asset=[pscustomobject]@{size=10485760}}
+ Apply-UpdateCheck $plan
+ Apply-UpdateDownload ([pscustomobject]@{version='1.4.1';bytes=10485760;file='UI-only-fixture.exe'})
+ if(-not $script:updateDialog.FindName('InstallUpdate').IsEnabled -or $script:updateDialog.FindName('UpdateHint').Text -notlike '*点击“安装更新”*'){throw 'PORTABLE_DIRECT_INSTALL_DISABLED'}
+ $plan.can_install=$false;$plan.install_reason='UPDATE_TARGET_UNRECOGNIZED';Apply-UpdateCheck $plan
+ if($script:updateDialog.FindName('InstallUpdate').IsEnabled){throw 'UNKNOWN_INSTALL_TARGET_ALLOWED'}
 }finally{$script:updateDialog.Close();$script:updateDialog=$null}

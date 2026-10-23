@@ -27,8 +27,6 @@ try{
  const npm=process.env.npm_execpath||path.join(path.dirname(process.execPath),'node_modules/npm/bin/npm-cli.js');await fs.access(npm);
  run(process.execPath,[npm,'ci','--omit=dev','--ignore-scripts','--no-audit','--no-fund'],path.join(payload,'runtime/skills/wechat-dialog'));
  run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(payload,'build.ps1')],payload);
- const csc=path.join(process.env.WINDIR||process.env.SystemRoot,'Microsoft.NET/Framework64/v4.0.30319/csc.exe');
- run(csc,['/nologo','/target:exe','/reference:System.Management.dll','/out:'+path.join(payload,'installer/SetupGuard.exe'),path.join(payload,'installer/SetupGuard.cs')],payload);
  const files=[];async function collect(directory){for(const entry of await fs.readdir(directory,{withFileTypes:true})){const file=path.join(directory,entry.name);if(entry.isSymbolicLink())throw Error('PAYLOAD_LINK_FORBIDDEN');if(entry.isDirectory())await collect(file);else{const relative=path.relative(payload,file).replaceAll('\\','/');if(/\.dpapi$|\.log$|\.receipt\.json$|notification-route\.json$|runtime-config\.json$|(?:^|\/)(?:jobs|qr|instances|work)(?:\/|$)/i.test(relative))throw Error('PRIVATE_FILE_IN_PAYLOAD');const data=await fs.readFile(file);files.push({path:relative,bytes:data.length,sha256:sha(data)});}}}
  await collect(payload);files.sort((a,b)=>a.path.localeCompare(b.path));await fs.writeFile(path.join(payload,'install-manifest.json'),JSON.stringify({schema:1,version,platform:'windows-x64',node_version:pins.node.version,files},null,2)+'\n');
  await verifyPayload(payload);run('powershell.exe',['-NoProfile','-STA','-ExecutionPolicy','Bypass','-File',path.join(payload,'src/Manager.ps1'),'-SelfTest'],payload);

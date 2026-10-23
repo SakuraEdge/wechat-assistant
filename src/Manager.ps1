@@ -60,6 +60,10 @@ $script:errors=@{
  UPDATE_INSTALLER_ONLY='当前为源码或便携目录，请打开下载目录，在独立目录安装。'
  UPDATE_HANDOFF_FAILED='无法准备安装，管理窗口保持打开；已停止的服务将尝试恢复。'
  UPDATE_PROCESS_UNVERIFIED='无法核对本安装目录的服务进程，请稍后重试，或手动停止服务再更新。'
+ UPDATE_INSTALL_LOCATION_FAILED='无法读取Windows安装位置，请稍后重新检测。'
+ UPDATE_TARGET_UNRECOGNIZED='目标目录已有无法识别的文件，本次不会覆盖。请先在Codex中核对安装位置。'
+ UPDATE_SOURCE_OVERLAP='找不到与源码/便携目录独立的安装位置，本次不会覆盖原目录。'
+ UPDATE_TARGET_NEWER='目标目录已装有更高版本，本次不会降级。'
 }
 [xml]$xaml=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Manager.xaml') -Raw -Encoding UTF8
 $script:window=[Windows.Markup.XamlReader]::Load([Xml.XmlNodeReader]::new($xaml))
@@ -70,7 +74,7 @@ $script:window.Width=[Math]::Min(1320,[Windows.SystemParameters]::WorkArea.Width
 if($env:CLAWBOT_MANAGER_WINDOW_SUFFIX){$script:window.Title=$script:window.Title+' · '+$env:CLAWBOT_MANAGER_WINDOW_SUFFIX}
 $script:ui=@{};foreach($name in @('Refresh','Add','Summary','Instances','Detail','Workspace','Chat','Connect','Start','Stop','Restart','OpenChat','OpenFolder','Role','Images','Files','Projects','Save','Message','Model','Effort','RefreshModels','SaveModel','ModelInfo','Persona','PersonaInfo','OpenCodex','Setup','Update','UsageBucket','UsageHint','RefreshUsage','FiveUsage','FiveProgress','FiveReset','WeekUsage','WeekProgress','WeekReset','PageScroller','PageTitle','PageSubtitle','InstancePicker','SelectionState','PageOverview','PageService','PagePermissions','PageModels','PageUpdates','NavOverview','NavService','NavPermissions','NavModels','NavUpdates','StatInstances','StatRunning','StatPending','OverviewEmpty','SidebarSummary','ServiceContext','PermissionContext','ModelContext','CurrentVersion','VersionLabel','InstanceScope','InstanceCount','ManageAll','ViewServices','ServiceHealth','ServiceBadge','ServiceGlyph','ConnectionDot','FiveCaption','FiveUsed','WeekCaption','WeekUsed')){$script:ui[$name]=$script:window.FindName($name);if(-not $script:ui[$name]){throw ('UI_CONTROL_MISSING: '+$name)}}
 $script:ui.VersionLabel.Text='v'+$script:packageVersion
-$script:ui.CurrentVersion.Text='当前源码版本 v'+$script:packageVersion+'。更新只提供正式版安装包，源码版本不自动覆盖。'
+$script:ui.CurrentVersion.Text='当前运行版本 v'+$script:packageVersion+'。检测正式版本后，在本窗口下载并安装更新。'
 $iconPath=Join-Path $script:appRoot 'assets\clawbot.ico'
 if(Test-Path -LiteralPath $iconPath){$script:window.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$iconPath)}
 . (Join-Path $PSScriptRoot 'Dialogs.ps1')

@@ -38,6 +38,7 @@ static class SetupGuard {
   if(details!=null)File.WriteAllText(details,String.Join(Environment.NewLine,blockers.ToArray()),Encoding.UTF8);
  }
  static int Main(string[] args) {
+  Console.OutputEncoding=new UTF8Encoding(false);
   var blockers=new List<string>();string details=null;
   try {
    if((args.Length!=1&&args.Length!=2&&args.Length!=3)||!Path.IsPathRooted(args[0]))return 43;

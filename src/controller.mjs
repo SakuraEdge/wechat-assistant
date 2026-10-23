@@ -8,6 +8,7 @@ import {instancePaths,instanceDataDirectory} from '../runtime/skills/wechat-dial
 import {normalizeUsage} from './account-usage.mjs';
 import {checkUpdate,downloadUpdate,verifyInstaller,updateDirectory} from './updates.mjs';
 import {launchUpdateHelper} from './update-launch.mjs';
+import {installationPlan,isInstalled} from './install-plan.mjs';
 
 export const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {version:appVersion}=JSON.parse(await fs.readFile(path.join(appRoot,'package.json'),'utf8'));
@@ -65,20 +66,24 @@ export async function snapshot(){
   const next=instances.length?Math.max(1,...instances.map(item=>Number(item.name.match(/^user-(\d+)$/)?.[1]||1)))+1:1;
   return {status:'ok',version:appVersion,default_persona,notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
 }
-async function installed(){const manifest=await json(path.join(appRoot,'install-manifest.json'));return !!(manifest?.platform==='windows-x64'&&manifest.version===appVersion&&await fs.access(path.join(appRoot,'unins000.exe')).then(()=>true,()=>false));}
+async function installPlan(latestVersion){
+ let defaultDirectory;
+ if(!await isInstalled(appRoot,appVersion)){const location=await run('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(appRoot,'src','install-location.ps1')]);defaultDirectory=location.directory;}
+ return installationPlan(appRoot,appVersion,latestVersion,{defaultDirectory});
+}
 async function updateAction(input,{onProgress}={}){
  const update=await checkUpdate(appVersion);
- if(input.action==='check-update')return {...update,installed:await installed()};
+ if(input.action==='check-update'){try{return {...update,...await installPlan(update.latest_version||appVersion)};}catch(error){return {...update,installed:await isInstalled(appRoot,appVersion),can_install:false,install_reason:error.message};}}
  if(!update.available||update.latest_version!==input.version)throw Error('UPDATE_CHANGED_RECHECK');
  const root=path.join(manager,'updates');
  if(input.action==='download-update')return downloadUpdate(update,root,{onProgress});
- if(!await installed())throw Error('UPDATE_INSTALLER_ONLY');
+ const plan=await installPlan(update.latest_version);
  if(!Number.isSafeInteger(input.manager_pid)||input.manager_pid<=0)throw Error('UPDATE_MANAGER_INVALID');
  if(!/^[0-9]{15,19}$/.test(input.manager_start_ticks||''))throw Error('UPDATE_MANAGER_INVALID');
  const directory=await updateDirectory(root,update.latest_version),file=path.join(directory,update.asset.name);
  await verifyInstaller(file,update.asset,root);
  const instances=[];for(const item of (await snapshot()).instances){const c=await config(item.name),s=await current(c);if(s.running)instances.push({c,s});}
- const processes=await run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(appRoot,'src','update-processes.ps1'),'-AppRoot',appRoot,'-ProcessIds',instances.map(item=>item.s.pid).join(',')]);
+ const processes=await run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(appRoot,'src','update-processes.ps1'),'-AppRoot',plan.install_directory,'-ProcessIds',instances.map(item=>item.s.pid).join(',')]);
  const owned=instances.filter(item=>processes.processes.some(proc=>proc.pid===item.s.pid&&proc.owned));
  if(owned.some(item=>isBusy(item.s)))throw Error('INSTANCE_BUSY');
  const stopped=[];let child,job;
@@ -87,7 +92,7 @@ async function updateAction(input,{onProgress}={}){
   const script=path.join(directory,'ApplyUpdate.ps1');await fs.copyFile(path.join(appRoot,'src','ApplyUpdate.ps1'),script);
   const guard=path.join(directory,'SetupGuard.exe');await fs.copyFile(path.join(appRoot,'installer','SetupGuard.exe'),guard);
   job=path.join(directory,randomBytes(16).toString('hex')+'.json');const jobs=path.join(manager,'jobs');await fs.mkdir(jobs,{recursive:true});
-  await fs.writeFile(job,JSON.stringify({installer:file,download_root:await fs.realpath(root),sha256:update.asset.sha256,bytes:update.asset.size,manager_pid:input.manager_pid,manager_start_ticks:input.manager_start_ticks,guard,app_root:appRoot,resume_instances:stopped,jobs_directory:jobs}));
+  await fs.writeFile(job,JSON.stringify({installer:file,download_root:await fs.realpath(root),sha256:update.asset.sha256,bytes:update.asset.size,manager_pid:input.manager_pid,manager_start_ticks:input.manager_start_ticks,guard,app_root:plan.install_directory,manager_root:appRoot,resume_instances:stopped,jobs_directory:jobs}));
   child=launchUpdateHelper(script,job,directory);let failed=false;child.on('error',()=>{failed=true;});
   const deadline=Date.now()+10000;while(!failed&&Date.now()<deadline){if(await fs.access(job+'.ready').then(()=>true,()=>false)){child.unref();return {status:'update_handoff',version:update.latest_version};}if(await fs.access(job+'.error.json').then(()=>true,()=>false))break;await delay(100);}
   throw Error('UPDATE_HANDOFF_FAILED');

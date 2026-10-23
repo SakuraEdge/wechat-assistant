@@ -9,4 +9,6 @@ $automation=[System.Management.Automation.PowerShell].Assembly.Location
 if($LASTEXITCODE -ne 0){throw 'Launcher build failed'}
 & $compiler /nologo /target:winexe /reference:System.Windows.Forms.dll ('/win32icon:'+(Join-Path $PSScriptRoot 'assets\clawbot.ico')) ('/out:'+(Join-Path $PSScriptRoot '微信助手.exe')) (Join-Path $PSScriptRoot 'src\LegacyLauncher.cs')
 if($LASTEXITCODE -ne 0){throw 'Compatibility launcher build failed'}
+& $compiler /nologo /target:exe /reference:System.Management.dll ('/out:'+(Join-Path $PSScriptRoot 'installer\SetupGuard.exe')) (Join-Path $PSScriptRoot 'installer\SetupGuard.cs')
+if($LASTEXITCODE -ne 0){throw 'Update process guard build failed'}
 Write-Output 'Build complete: ClawBot实例管理器.exe'

@@ -1,6 +1,7 @@
 ﻿#requires -Version 5.1
 param([string]$JobFile,[switch]$SelfTest,[switch]$NonInteractive)
 $ErrorActionPreference='Stop'
+[Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
 $restoreAttempted=$false
 $blockers=@()
 function Stop-IfCancelled {if([IO.File]::Exists($JobFile+'.cancel')){exit 0}}
@@ -36,6 +37,7 @@ function Restore-UpdateServices($job){
 function Open-UpdatedManager($job){
  Add-Type -AssemblyName System.Management
  $manager=Join-Path $job.app_root 'ClawBot实例管理器.exe'
+ if(-not [IO.File]::Exists($manager) -and $job.manager_root){$manager=Join-Path $job.manager_root 'ClawBot实例管理器.exe'}
  $search=[Management.ManagementObjectSearcher]::new("SELECT ExecutablePath FROM Win32_Process WHERE Name='ClawBot实例管理器.exe'")
  try{$already=@($search.Get()|Where-Object {$_.ExecutablePath -ieq $manager}).Count}finally{$search.Dispose()}
  if(-not $already){Start-Process -FilePath $manager -WindowStyle Normal}
@@ -63,8 +65,8 @@ try{
  Wait-InstallDirectory $job
  Assert-UpdateFile $job
  Stop-IfCancelled
- $arguments=@('/SP-','/NORESTART',('/DIR="'+$job.app_root+'"'))
- if($NonInteractive){$arguments+=@('/VERYSILENT','/SUPPRESSMSGBOXES')}
+ $arguments=@('/SP-','/NORESTART','/SUPPRESSMSGBOXES',('/DIR="'+$job.app_root+'"'),('/LOG="'+$JobFile+'.install.log"'))
+ $arguments+=if($NonInteractive){'/VERYSILENT'}else{'/SILENT'}
  $install=Start-Process -FilePath $job.installer -ArgumentList $arguments -WorkingDirectory ([IO.Path]::GetDirectoryName($job.installer)) -WindowStyle Normal -PassThru
  $install.WaitForExit()
  $resumeFailed=@(Restore-UpdateServices $job);$restoreAttempted=$true
