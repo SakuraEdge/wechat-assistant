@@ -11,7 +11,7 @@
 | Windows 10 / 11 x64 | 已提供 EXE 安装包与内置运行环境便携包 | [下载最新 Release](https://github.com/SakuraEdge/wechat-assistant/releases/latest) |
 | macOS / Linux | 计划中，当前不能运行此 Windows 界面 | 后续按实际适配进展更新本页 |
 
-推荐下载 [v1.4.0 Windows 安装包](https://github.com/SakuraEdge/wechat-assistant/releases/download/v1.4.0/ClawBot-Instance-Manager-Setup-1.4.0-windows-x64.exe)，双击按向导安装。安装包内置经过SHA-256核对的Node.js 24.16.0及扫码依赖，无需手动安装Node/npm、运行命令或编译。
+推荐下载 [v1.4.2 Windows 安装包](https://github.com/SakuraEdge/wechat-assistant/releases/download/v1.4.2/ClawBot-Instance-Manager-Setup-1.4.2-windows-x64.exe)，双击按向导安装。安装包内置经过SHA-256核对的Node.js 24.16.0及扫码依赖，无需手动安装Node/npm、运行命令或编译。
 
 [Release 下载页](https://github.com/SakuraEdge/wechat-assistant/releases/latest)同时提供便携ZIP、文件清单和SHA256SUMS.txt。当前安装包未添加发布者代码签名，可核对Release中的SHA-256；软件不附带Codex账号或模型额度。
 
@@ -25,7 +25,7 @@ git clone https://github.com/SakuraEdge/wechat-assistant.git
 
 ## 安装包首次使用（推荐）
 
-1. 下载并双击 **ClawBot-Instance-Manager-Setup-1.4.0-windows-x64.exe**，按向导点击安装。默认安装到当前用户的`%LOCALAPPDATA%\Programs\ClawBotInstanceManager`，无需管理员权限，不修改系统PATH。
+1. 下载并双击 **ClawBot-Instance-Manager-Setup-1.4.2-windows-x64.exe**，按向导点击安装。默认安装到当前用户的`%LOCALAPPDATA%\Programs\ClawBotInstanceManager`，无需管理员权限，不修改系统PATH。
 2. 安装完成打开管理器。首次引导按步骤提示：打开并登录Codex → **复制连接提示** → 在Codex对话中粘贴发送 → 等助手明确说初始化完成。
 3. 回到管理器点击 **重新检测连接**。按钮会立即显示“正在检测”，完成后显示带时间的结果气泡并弹出结果提示；失败时按提示重新初始化。检测会实际请求客户端模型接口，首次引导不会阻塞后台检测。
 4. 检测通过后点击 **下一步：新增微信用户**，填写名称，再本人微信扫码；也可返回主界面点击 **新增微信用户**。连接Codex不等于已经新增或绑定微信。第一位为`primary`主用户，后续每人独立新增、独立扫码。发送“你好”核对回复后即可安排工作。
@@ -81,6 +81,12 @@ git clone https://github.com/SakuraEdge/wechat-assistant.git
 4. 安装程序结束后尝试恢复此次停止的服务并重新打开管理器；取消或失败也会尝试恢复并提示核对。账号、角色、模型、人设与聊天继续保存在用户数据目录。
 
 v1.4.1起，源码/便携版同样可点击 **安装更新**：优先使用本人已有的管理器安装位置，否则安装到 Windows 当前用户的独立软件目录，保留原源码/便携目录。目标非空且无法识别、与源码重叠或版本更高时拒绝覆盖；更新窗口显示原因。**打开下载目录**仅供查看文件，不是安装的必要步骤。版本依据已发布的Release标签，而非源码提交；当前源码版本高于已发布安装版时不会降级。未提供安装包、大小或校验信息时不会开始安装。[GitHub Release接口说明](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)。
+
+### 主账号执行任务与访问范围
+
+微信工作任务使用可执行任务的Default模式；普通闲聊继续使用独立的轻量聊天通道。默认执行范围仍为工作区，保留审批。主用户明确要求完全访问时，可由本机维护助手在登记的primary用户数据目录保存`execution-policy.json`：`{"version":1,"instance":"primary","access":"full"}`，待服务空闲后重启生效。此时primary的工作会话使用`danger-full-access`及`never`，能访问本机文件和网络；请仅在本人明确授权的电脑上启用。删除配置或改为`workspace`并空闲重启可恢复默认范围。
+
+配置只从登记的用户数据目录加载，不从消息、附件、人设或工作目录读取；其他实例即使复制该设置也不会获得完全访问。配置不随安装包分发，不改变其他账号或全局提供商、模型。服务启动、恢复和每次工作任务都会应用已加载设置。
 
 ### 管理账号与服务
 

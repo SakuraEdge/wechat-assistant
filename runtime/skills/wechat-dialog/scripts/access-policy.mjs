@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {fullExecution} from './execution-policy.mjs';
 
 export const ACCESS_POLICY_VERSION='wechat-roles-v1';
 const capabilityNames=['images','files','projects'];
@@ -50,6 +51,7 @@ export function workConfig(state) {
   return {features:{computer_use:false,browser_use:false,image_generation:policy.capabilities.images},mcp_servers:{node_repl:{enabled:false},cua_repl:{enabled:false},...(policy.capabilities.projects?{}:{codex_app:{enabled:false}})}};
 }
 export function workSandbox(state,env=process.env) {
+  if(fullExecution(state))return {type:'dangerFullAccess'};
   // The installed Windows protocol has no restricted-read sandbox field. Roles
   // are business policy; use the supported workspace boundary, not a fake field.
   return {type:'workspaceWrite',writableRoots:[state.cwd],networkAccess:false};

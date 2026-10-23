@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "docs/FEATURES.md",
-      "sha256": "73fb22c88821ff05444c260e8b4b266383fa02a06155a709b7483b39239741dd"
+      "sha256": "e10f6d40ead14c2245e4e75047200a60b5a5415a1ec3f3bb59eddd8330a36c24"
     },
     {
       "path": "docs/OPERATIONS.md",
@@ -19,7 +19,7 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/access-policy.mjs",
-      "sha256": "079efcabcbc8a39603857dfc339986d35bebab251fa8dec47be1fa0e9f3ded93"
+      "sha256": "ff8612b650d9c83dc4c87e3d5eb8271d4e635787cece0f48e626d381b3f910a5"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/ack-stickers.mjs",
@@ -31,11 +31,15 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/core.mjs",
-      "sha256": "13485b1236171241c1f9b5f4d889fde068e08a58f87e1449f1b2dbb1370c813a"
+      "sha256": "3b615f6392d6108dfc631055d30cc2bf760e81bc0e49288b2fef113c6869b1a0"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/desktop-connection.mjs",
       "sha256": "44fb7eec5beb5bb801e52a3d7a98c2f5384e17a269694a412d100b5f816fcad0"
+    },
+    {
+      "path": "runtime/skills/wechat-dialog/scripts/execution-policy.mjs",
+      "sha256": "734b05cbefd7b4702214b8d158570ff1a912d1fac98670e8bd6877862c1a6544"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/fast-chat.mjs",
@@ -91,7 +95,7 @@
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-bot.mjs",
-      "sha256": "417ae274734cb267ff04251b619987f201ec27ffde18f3ca03cbd600521ae4f9"
+      "sha256": "5c034243a8473054b075e75d2b4378ac97f7686aa3f1e22546344a51a9908772"
     },
     {
       "path": "runtime/skills/wechat-dialog/scripts/wechat-instance.ps1",
@@ -130,6 +134,10 @@
       "sha256": "cbc4dd71732531712ff9a2382ebd2eed49880b97b42767d36139c7a741e3884c"
     },
     {
+      "path": "templates/workspace/outputs/persona/README.md",
+      "sha256": "846462686866f73842da84718e383042f4ed48b643a150d23593f0e4259167a8"
+    },
+    {
       "path": "templates/workspace/outputs/persona/references/fish-cosplay.png",
       "sha256": "d23213461b29c1c206142da60e2d64ed57111efbafc5b5f116512b7c1b7d2fa8"
     },
@@ -164,6 +172,10 @@
     {
       "path": "tests/access-policy.test.mjs",
       "sha256": "602f955f5ddc11d1aa6b97648987cc7be80c8cc0442437f12b8dac6627d55ca8"
+    },
+    {
+      "path": "tests/execution-policy.test.mjs",
+      "sha256": "1f6af29d87c429c71dca21a7ffa8e02a949f57bc637349a4338a220a358f044b"
     },
     {
       "path": "tests/model-policy.test.mjs",

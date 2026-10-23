@@ -10,6 +10,7 @@ import { uploadWechatFile, attachmentContext } from './file-transfer.mjs';
 import { classifyMessage, entryIntent, isControlMessage } from './message-routing.mjs';
 import {projectInstructions,rememberProjectDispatch} from './project-bridge.mjs';
 import {principalInstructions,workSandbox,workConfig} from './access-policy.mjs';
+import {fullExecution} from './execution-policy.mjs';
 import {DEFAULT_MODEL,modelFor} from './model-policy.mjs';
 import {personaInstructions,DEFAULT_PERSONA} from './persona-profile.mjs';
 import {recordMessage} from './conversation-log.mjs';
@@ -202,7 +203,7 @@ export class RpcClient {
     });
   }
   async initialize() {
-    await this.request('initialize', { clientInfo: { name: 'codex_wechat', title: 'Codex WeChat', version: '1.0.0' } });
+    await this.request('initialize', { clientInfo: { name: 'codex_wechat', title: 'Codex WeChat', version: '1.0.0' }, capabilities:{experimentalApi:true} });
     this.send({ method: 'initialized', params: {} });
   }
   fail(error) { for (const waiter of this.pending.values()) { clearTimeout(waiter.timer); waiter.reject(error); } this.pending.clear(); for (const listener of this.disconnectListeners) listener(error); }
@@ -213,6 +214,7 @@ export class RpcClient {
 export const WECHAT_PERMISSIONS = Object.freeze({
   approvalPolicy: 'on-request', approvalsReviewer: 'auto_review', sandbox: 'workspace-write'
 });
+export const wechatPermissions=state=>fullExecution(state)?{...WECHAT_PERMISSIONS,approvalPolicy:'never',sandbox:'danger-full-access'}:WECHAT_PERMISSIONS;
 export const WECHAT_MODEL = DEFAULT_MODEL;
 export const WECHAT_THREAD_MODEL = Object.freeze({ model: WECHAT_MODEL.model,
   config: { model_reasoning_effort: WECHAT_MODEL.effort } });
@@ -222,12 +224,13 @@ export function threadConfig(rpc,state) {
   const overrides=Object.fromEntries(Object.entries(access.mcp_servers||{}).filter(([name])=>known.has(name)));
   return {...WECHAT_THREAD_MODEL.config,...rpc.projectConfig,...access,model_reasoning_effort:modelFor(state).effort,mcp_servers:{...(rpc.projectConfig?.mcp_servers||{}),...overrides}};
 }
-export function confirmWechatPermissions(rpc, response) {
-  if (response.approvalPolicy !== 'on-request' || response.approvalsReviewer !== 'auto_review' ||
-      response.sandbox?.type !== 'workspaceWrite') throw new Error('CODEX_PERMISSIONS_NOT_APPLIED');
+export function confirmWechatPermissions(rpc, response, state={}) {
+  const expected=wechatPermissions(state);
+  if (response.approvalPolicy !== expected.approvalPolicy || response.approvalsReviewer !== expected.approvalsReviewer ||
+      response.sandbox?.type !== (fullExecution(state)?'dangerFullAccess':'workspaceWrite')) throw new Error('CODEX_PERMISSIONS_NOT_APPLIED');
   rpc.wechatPermissions = {
     permissions_verified: true, approval_policy: response.approvalPolicy,
-    approvals_reviewer: response.approvalsReviewer, sandbox_mode: 'workspace-write', effective_workspace: response.cwd
+    approvals_reviewer: response.approvalsReviewer, sandbox_mode: expected.sandbox, execution_mode:'default', effective_workspace: response.cwd
   };
 }
 
@@ -235,16 +238,16 @@ export async function resumeWechatThread(rpc, state, persist) {
   if (!state.threadId) return;
   let response;
   try {
-    response = await rpc.request('thread/resume', { threadId: state.threadId, cwd: state.cwd, excludeTurns: true, developerInstructions:serviceInstructions(state), ...WECHAT_THREAD_MODEL, model:modelFor(state).model, config:threadConfig(rpc,state), ...WECHAT_PERMISSIONS });
+    response = await rpc.request('thread/resume', { threadId: state.threadId, cwd: state.cwd, excludeTurns: true, developerInstructions:serviceInstructions(state), ...WECHAT_THREAD_MODEL, model:modelFor(state).model, config:threadConfig(rpc,state), ...wechatPermissions(state) });
   } catch (error) {
     if (error.message !== 'CODEX_RPC_-32600' || !error.rpcMessage?.includes('already has an active writer')) throw error;
-    response = await rpc.request('thread/fork', { threadId: state.threadId, cwd: state.cwd, excludeTurns: true, developerInstructions:serviceInstructions(state), ...WECHAT_THREAD_MODEL, model:modelFor(state).model, config:threadConfig(rpc,state), ...WECHAT_PERMISSIONS });
+    response = await rpc.request('thread/fork', { threadId: state.threadId, cwd: state.cwd, excludeTurns: true, developerInstructions:serviceInstructions(state), ...WECHAT_THREAD_MODEL, model:modelFor(state).model, config:threadConfig(rpc,state), ...wechatPermissions(state) });
     state.threadId = response.thread.id;
     await persist();
     try { await rpc.request('thread/name/set', { threadId: state.threadId, name: '微信 Codex 助手（' + (state.instanceId || 'primary') + '，独立）' }); } catch { }
     rpc.threadRecovered = true;
   }
-  confirmWechatPermissions(rpc, response);
+  confirmWechatPermissions(rpc, response, state);
 }
 
 const activeAcks = new WeakMap();
@@ -274,10 +277,10 @@ export async function acknowledgeEntry(api, state, entry, persist) {
 export async function agentTurn(rpc, state, entry, persist, onApproval, onProgress = () => {}) {
   if (!state.threadId) {
     const result = await rpc.request('thread/start', {
-      cwd: state.cwd, ...WECHAT_THREAD_MODEL, model:modelFor(state).model, config:threadConfig(rpc,state), ...WECHAT_PERMISSIONS,
+      cwd: state.cwd, ...WECHAT_THREAD_MODEL, model:modelFor(state).model, config:threadConfig(rpc,state), ...wechatPermissions(state),
       developerInstructions:serviceInstructions(state)
     });
-    confirmWechatPermissions(rpc, result);
+    confirmWechatPermissions(rpc, result, state);
     state.threadId = result.thread.id; await persist();
     try { await rpc.request('thread/name/set', { threadId: state.threadId, name: '微信 Codex 助手（' + (state.instanceId || 'primary') + '）' }); } catch { }
   }
@@ -323,8 +326,9 @@ export async function agentTurn(rpc, state, entry, persist, onApproval, onProgre
         state.latestNotification.slice(0, 5000) + '\n' : '')+'【微信用户本次指令】\n'+currentText;
     const result = await rpc.request('turn/start', {
       threadId: state.threadId, cwd: state.cwd, clientUserMessageId: entry.id, ...modelFor(state),
-      approvalPolicy: 'on-request', approvalsReviewer: 'auto_review',
+      approvalPolicy: wechatPermissions(state).approvalPolicy, approvalsReviewer: 'auto_review',
       sandboxPolicy: workSandbox(state),
+      collaborationMode:{mode:'default',settings:{model:modelFor(state).model,reasoning_effort:modelFor(state).effort,developer_instructions:null}},
       input: [{ type: 'text', text: prompt }, ...(entry.imagePaths || []).map(filename => ({ type: 'localImage', path: filename }))]
     });
     turnId = result.turn.id; entry.turnId = turnId; await persist();

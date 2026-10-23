@@ -18,6 +18,7 @@ dist/
 **/state.json
 **/auth.json
 **/credentials.json
+**/execution-policy.json
 **/*.receipt.json
 .codex/
 .idea/

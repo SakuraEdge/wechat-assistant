@@ -14,6 +14,7 @@ import { queueOutgoingFile, queueResultFiles,queueProjectFile } from './file-del
 import {PROJECT_BRIDGE_VERSION,loadProjectToolConfig,prepareProjectResults,callProjectTool} from './project-bridge.mjs';
 import {QUESTION_BROKER_VERSION,QuestionBroker} from './question-broker.mjs';
 import {ACCESS_POLICY_VERSION,loadAccessPolicy,policyFor,deniedRequest} from './access-policy.mjs';
+import {loadExecutionPolicy} from './execution-policy.mjs';
 import {desktopEnvironment} from './desktop-connection.mjs';
 import {instancePaths,instanceDataDirectory} from './instance-paths.mjs';
 import {enqueueDesktopCommand,drainDesktopCommands} from './manager-commands.mjs';
@@ -136,6 +137,7 @@ async function smoke() {
   const state = await store.load();
   if (!state?.codex) throw new Error('RUN_PREPARE_FIRST');
   state.accessPolicy=await loadAccessPolicy(dataDir,state.instanceId||'primary');
+  state.executionPolicy=await loadExecutionPolicy(dataDir,state.instanceId||'primary');
   state.modelSelection=await loadModelPolicy(dataDir);
   const meta = await loadMeta();
   if (meta.pid && alive(meta.pid)) throw new Error('WORKER_ALREADY_RUNNING');
@@ -278,6 +280,7 @@ async function run() {
   const state = await store.load();
   if (!state?.credentials) throw new Error('WECHAT_LOGIN_REQUIRED');
   state.accessPolicy=await loadAccessPolicy(dataDir,state.instanceId||'primary');
+  state.executionPolicy=await loadExecutionPolicy(dataDir,state.instanceId||'primary');
   state.modelSelection=await loadModelPolicy(dataDir);
   state.persona=await runtimePersona(dataDir,state.cwd);
   await fs.mkdir(dataDir, { recursive: true });
