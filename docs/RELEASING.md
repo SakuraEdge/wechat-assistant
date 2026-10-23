@@ -11,6 +11,8 @@
 3. 运行 `node tools/build-release.mjs --compiler "完整路径/ISCC.exe"`，也可提供`ISCC_PATH`环境变量。脚本只使用软件目录；干净暂存目录按锁文件执行npm ci、编译、生成清单并校验，缺少Node二进制时从固定官方地址下载并核对哈希。
 4. 产物位于`dist/release-v<版本>/`：EXE安装器、内置Node的便携ZIP、`install-manifest.json`和`SHA256SUMS.txt`。不会包含父工作区、认证、运行队列、聊天记录或用户产物。
 
+构建和发布前均须启用本机 Defender；脚本对实际 EXE/ZIP 扫描，检测或扫描失败则中止，不自动允许威胁或添加排除项。构建结果 `security_report` 指向含情报版本、大小/哈希的本地记录；单机未检出不是微软判定。已知告警处理与提交材料见[安全排查记录](SECURITY.md)。
+
 安装器不会更改系统PATH。管理器、实例管理及完成通知优先使用包内Node。Node许可证在`runtime/node/LICENSE`，扫码依赖许可证随相应node_modules分发；中文安装文本保留原翻译署名。当前未配置发布者代码签名，不能把编译器签名误称为本软件安装包签名。
 
 ## 验证

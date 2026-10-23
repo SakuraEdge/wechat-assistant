@@ -1,9 +1,9 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "files": [
     {
       "path": "docs/FEATURES.md",
-      "sha256": "2b22c0de60fcd85c6de79c272632e77c52c3e182af9da4faed54d90006631489"
+      "sha256": "791069a0ae70a200417382ea07ce6b3a1365dedf5d1fe5812a740dae31396d19"
     },
     {
       "path": "docs/OPERATIONS.md",

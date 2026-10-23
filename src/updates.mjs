@@ -75,19 +75,27 @@ export async function verifyInstaller(file,asset,root){
  const hash=createHash('sha256');const handle=await fs.open(file,'r');try{for await(const chunk of handle.createReadStream())hash.update(chunk);}finally{await handle.close();}
  if(hash.digest('hex')!==asset.sha256)throw Error('UPDATE_HASH_MISMATCH');return file;
 }
-export async function downloadUpdate(update,root,{fetchImpl=fetch}={}){
+export async function downloadUpdate(update,root,{fetchImpl=fetch,onProgress,now=()=>Date.now()}={}){
  if(!update.available||!update.asset)throw Error('UPDATE_NOT_AVAILABLE');
  const directory=await updateDirectory(root,update.latest_version),file=path.join(directory,update.asset.name);
- try{await verifyInstaller(file,update.asset,root);return {status:'update_downloaded',version:update.latest_version,file,bytes:update.asset.size};}catch(error){if(error.code!=='ENOENT'&&error.message==='UPDATE_PATH_REJECTED')throw error;}
+ const started=now();let reported=-Infinity;
+ const progress=async(phase,received,force=false)=>{
+  const time=now();if(!force&&time-reported<200)return;reported=time;
+  const speed=received/Math.max((time-started)/1000,0.001);
+  const value={status:'update_progress',version:update.latest_version,phase,received_bytes:received,total_bytes:update.asset.size,percent:phase==='ready'?100:Math.min(99.9,received/update.asset.size*100),speed_bytes_per_second:phase==='downloading'?Math.round(speed):null,eta_seconds:phase==='downloading'&&speed>0?Math.ceil((update.asset.size-received)/speed):null};
+  if(onProgress)await onProgress(value);
+ };
+ await progress('connecting',0,true);
+ try{await verifyInstaller(file,update.asset,root);await progress('ready',update.asset.size,true);return {status:'update_downloaded',version:update.latest_version,file,bytes:update.asset.size};}catch(error){if(error.code!=='ENOENT'&&error.message==='UPDATE_PATH_REJECTED')throw error;}
  const temporary=path.join(directory,randomBytes(16).toString('hex')+'.part');let handle;
  try{
   const response=await assetResponse(update.asset.url,fetchImpl),length=response.headers.get('content-length');
   if(length!==null&&Number(length)!==update.asset.size)throw Error('UPDATE_SIZE_MISMATCH');
   handle=await fs.open(temporary,'wx');const hash=createHash('sha256');let size=0;
-  for await(const chunk of response.body){size+=chunk.length;if(size>update.asset.size||size>MAX_INSTALLER)throw Error('UPDATE_SIZE_MISMATCH');hash.update(chunk);await handle.writeFile(chunk);}
-  await handle.close();handle=null;if(size!==update.asset.size||hash.digest('hex')!==update.asset.sha256)throw Error('UPDATE_HASH_MISMATCH');
+  for await(const chunk of response.body){size+=chunk.length;if(size>update.asset.size||size>MAX_INSTALLER)throw Error('UPDATE_SIZE_MISMATCH');hash.update(chunk);await handle.writeFile(chunk);await progress('downloading',size);}
+  await handle.close();handle=null;await progress('verifying',size,true);if(size!==update.asset.size||hash.digest('hex')!==update.asset.sha256)throw Error('UPDATE_HASH_MISMATCH');
   if(await fs.lstat(file).then(stat=>stat.isSymbolicLink(),error=>{if(error.code==='ENOENT')return false;throw error;}))throw Error('UPDATE_PATH_REJECTED');
-  await fs.rename(temporary,file);await verifyInstaller(file,update.asset,root);
+  await fs.rename(temporary,file);await verifyInstaller(file,update.asset,root);await progress('ready',size,true);
   return {status:'update_downloaded',version:update.latest_version,file,bytes:size};
  }finally{if(handle)await handle.close();await fs.unlink(temporary).catch(error=>{if(error.code!=='ENOENT')throw error;});}
 }

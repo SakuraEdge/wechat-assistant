@@ -6,12 +6,24 @@ using System.Management.Automation.Runspaces;
 using System.Threading;
 using System.Runtime.InteropServices;
 using System.Reflection;
+using System.Text;
 [assembly: AssemblyTitle("ClawBot实例管理器")]
 [assembly: AssemblyDescription("ClawBot实例管理器")]
 [assembly: AssemblyProduct("ClawBot实例管理器")]
-[assembly: AssemblyVersion("1.4.0.0")]
-[assembly: AssemblyFileVersion("1.4.0.0")]
+[assembly: AssemblyVersion("1.4.1.0")]
+[assembly: AssemblyFileVersion("1.4.1.0")]
 static class Launcher {
+ static string Safe(string value){return (value??"").Replace("\\","\\\\").Replace("\"","\\\"").Replace("\r","").Replace("\n","");}
+ static void Diagnose(string phase,ErrorRecord error,Exception exception,bool show) {
+  var script=error==null||error.InvocationInfo==null?"Manager.ps1":Path.GetFileName(error.InvocationInfo.ScriptName);
+  var line=error==null||error.InvocationInfo==null?0:error.InvocationInfo.ScriptLineNumber;
+  var type=exception==null?"PowerShellError":exception.GetType().FullName;
+  try {
+   var directory=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Codex","wechat-manager","diagnostics");Directory.CreateDirectory(directory);
+   File.WriteAllText(Path.Combine(directory,"manager-last-error.json"),"{\"phase\":\""+Safe(phase)+"\",\"script\":\""+Safe(script)+"\",\"line\":"+line+",\"exception_type\":\""+Safe(type)+"\",\"at\":\""+DateTime.UtcNow.ToString("o")+"\"}",new UTF8Encoding(false));
+  }catch{}
+  if(show)MessageBox.Show("管理器运行出错："+script+(line>0?" 第"+line+"行":"")+"（"+type+"）。\n脱敏诊断保存在本机 wechat-manager\\diagnostics\\manager-last-error.json，请在Codex中检查对应窗口代码。","ClawBot实例管理器");
+ }
  [DllImport("shell32.dll", CharSet=CharSet.Unicode)] static extern int SetCurrentProcessExplicitAppUserModelID(string id);
  [STAThread] static void Main() {
   SetCurrentProcessExplicitAppUserModelID("ClawBot.InstanceManager");
@@ -28,10 +40,12 @@ static class Launcher {
       powershell.Runspace=space;
       powershell.AddCommand("Set-ExecutionPolicy").AddParameter("Scope","Process").AddParameter("ExecutionPolicy","Bypass").AddParameter("Force");powershell.Invoke();powershell.Commands.Clear();powershell.Streams.Error.Clear();
       powershell.AddCommand(script);powershell.Invoke();
-      if(powershell.HadErrors)MessageBox.Show("管理窗口未能正常运行，请在Codex中检查src/Manager.ps1。","ClawBot实例管理器");
+      var handoff=space.SessionStateProxy.GetVariable("ClawBotUpdateHandoff");
+      if(powershell.HadErrors&&!Object.Equals(handoff,true))Diagnose("run",powershell.Streams.Error.Count>0?powershell.Streams.Error[0]:null,null,powershell.InvocationStateInfo.State==PSInvocationState.Failed);
      }
     }
-   }catch{MessageBox.Show("无法启动，请检查 Windows PowerShell、Node24与文件包。","ClawBot实例管理器");}
+   }catch(RuntimeException error){Diagnose("run",error.ErrorRecord,error,true);}
+   catch(Exception error){Diagnose("start",null,error,true);}
   }
  }
 }

@@ -30,10 +30,31 @@ function Apply-Usage($result){
 }
 function New-UpdateDialog {
  return Read-Dialog @'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="检测更新" Width="650" Height="440" MinWidth="600" MinHeight="400" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F8F9FC"><Grid Margin="26"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock Text="ClawBot实例管理器 · 软件更新" FontSize="22" FontWeight="SemiBold" Foreground="#242636"/><Border Grid.Row="1" Background="#F0EDFA" CornerRadius="8" Padding="15" Margin="0,18,0,14"><TextBlock Name="UpdateHint" Text="正在检查GitHub正式版本，请稍候…" TextWrapping="Wrap" LineHeight="24" Foreground="#66578E"/></Border><TextBlock Grid.Row="2" Name="UpdateDetails" Text="仅检查 SakuraEdge/wechat-assistant 的正式Release。下载后核对大小与SHA-256，点击安装才会执行安装程序。&#10;&#10;安装版：将停止此安装目录的空闲服务并关闭管理窗口，安装完成后恢复服务。忙碌时请等待任务完成。&#10;&#10;源码/便携版：可下载安装包，在独立安装目录使用，保留原目录。" TextWrapping="Wrap" LineHeight="24" Foreground="#64748B"/><WrapPanel Grid.Row="3" Margin="0,15,0,0"><Button Name="CheckUpdateAgain" Content="重新检测" Padding="12,9" Margin="0,0,8,0"/><Button Name="DownloadUpdate" Content="下载更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="InstallUpdate" Content="安装更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0" Background="#7864DC" BorderBrush="#7864DC" Foreground="White"/><Button Name="OpenDownload" Content="打开下载目录" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="CloseUpdate" Content="关闭" Padding="12,9"/></WrapPanel></Grid></Window>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="检测更新" Width="670" Height="540" MinWidth="630" MinHeight="510" WindowStartupLocation="CenterOwner" FontFamily="Microsoft YaHei UI" Background="#F8F9FC"><Grid Margin="26"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock Text="ClawBot实例管理器 · 软件更新" FontSize="22" FontWeight="SemiBold" Foreground="#242636"/><Border Grid.Row="1" Background="#F0EDFA" CornerRadius="8" Padding="15" Margin="0,18,0,14"><TextBlock Name="UpdateHint" Text="正在检查GitHub正式版本，请稍候…" TextWrapping="Wrap" LineHeight="24" Foreground="#66578E"/></Border><StackPanel Grid.Row="2" Name="DownloadProgressPanel" Visibility="Collapsed" Margin="0,0,0,16"><Grid Margin="0,0,0,7"><TextBlock Name="DownloadStage" Text="正在连接下载…" Foreground="#554A80" FontWeight="SemiBold"/><TextBlock Name="DownloadPercent" Text="0%" HorizontalAlignment="Right" Foreground="#554A80"/></Grid><ProgressBar Name="DownloadProgress" Minimum="0" Maximum="100" Height="10" Foreground="#7864DC" Background="#E9E5F5"/><TextBlock Name="DownloadMetrics" Text="等待接收数据" Margin="0,8,0,0" Foreground="#64748B"/></StackPanel><TextBlock Grid.Row="3" Name="UpdateDetails" Text="仅检查 SakuraEdge/wechat-assistant 的正式Release。下载后核对大小与SHA-256，点击安装才会执行安装程序。&#10;&#10;安装版：将停止此安装目录的空闲服务并关闭管理窗口，等待相关进程退出后安装；完成后尝试恢复服务。忙碌时请等待任务完成。&#10;&#10;源码/便携版：可下载安装包，在独立安装目录使用，保留原目录。" TextWrapping="Wrap" LineHeight="24" Foreground="#64748B"/><WrapPanel Grid.Row="4" Margin="0,15,0,0"><Button Name="CheckUpdateAgain" Content="重新检测" Padding="12,9" Margin="0,0,8,0"/><Button Name="DownloadUpdate" Content="下载更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="InstallUpdate" Content="安装更新" IsEnabled="False" Padding="12,9" Margin="0,0,8,0" Background="#7864DC" BorderBrush="#7864DC" Foreground="White"/><Button Name="OpenDownload" Content="打开下载目录" IsEnabled="False" Padding="12,9" Margin="0,0,8,0"/><Button Name="CloseUpdate" Content="关闭" Padding="12,9"/></WrapPanel></Grid></Window>
 '@
 }
-function Update-Hint([string]$text){Say $text;if($script:updateDialog -and $script:updateDialog.IsVisible){$script:updateDialog.FindName('UpdateHint').Text=$text}}
+function Update-Hint([string]$text){Say $text;if($script:updateDialog){$script:updateDialog.FindName('UpdateHint').Text=$text}}
+function Apply-DownloadProgress($value){
+ if($value.status -ne 'update_progress' -or $value.total_bytes -le 0 -or $value.received_bytes -lt 0 -or $value.received_bytes -gt $value.total_bytes -or $value.phase -notin @('connecting','downloading','verifying','ready')){return}
+ $script:downloadProgress=$value;$dialog=$script:updateDialog
+ if(-not $dialog -or -not $dialog.IsVisible){return}
+ $dialog.FindName('DownloadProgressPanel').Visibility='Visible'
+ $percent=[Math]::Max(0,[Math]::Min(100,[double]$value.percent))
+ $dialog.FindName('DownloadProgress').Value=$percent;$dialog.FindName('DownloadPercent').Text=('{0:0.#}%' -f $percent)
+ $dialog.FindName('DownloadStage').Text=@{connecting='正在连接下载…';downloading='正在下载安装包';verifying='正在校验大小与 SHA-256…';ready='下载完成 · 校验通过'}[$value.phase]
+ $metrics=('{0:0.0} / {1:0.0} MiB' -f ($value.received_bytes/1MB),($value.total_bytes/1MB))
+ if($value.phase -eq 'downloading' -and $value.speed_bytes_per_second -gt 0){$metrics+=(' · {0:0.0} MiB/s' -f ($value.speed_bytes_per_second/1MB));if($null -ne $value.eta_seconds){$metrics+=' · 约剩 '+$value.eta_seconds+' 秒'}}
+ $dialog.FindName('DownloadMetrics').Text=$metrics
+}
+function Read-DownloadProgress($job){
+ if(-not $job.ProgressFile -or -not [IO.File]::Exists($job.ProgressFile)){return}
+ try{
+  $stream=[IO.File]::Open($job.ProgressFile,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+  $reader=[IO.StreamReader]::new($stream,[Text.Encoding]::UTF8)
+  try{$value=$reader.ReadToEnd()|ConvertFrom-Json}finally{$reader.Dispose()}
+  Apply-DownloadProgress $value
+ }catch{}
+}
 function Begin-UpdateCheck {
  if(Begin-JobCommand @{action='check-update';name=''}){Update-Hint '正在检测GitHub正式版本，请稍候…';if($script:updateDialog){$script:updateDialog.FindName('CheckUpdateAgain').IsEnabled=$false;$script:updateDialog.FindName('DownloadUpdate').IsEnabled=$false;$script:updateDialog.FindName('InstallUpdate').IsEnabled=$false}}
 }
@@ -41,10 +62,11 @@ function Apply-UpdateCheck($result){
  $script:updateState=$result;$dialog=$script:updateDialog
  $text=if($result.available){'发现新版本 '+$result.latest_version+'（当前 '+$result.current_version+'），安装包约 '+[math]::Round($result.asset.size/1MB,1)+' MiB。点击“下载更新”继续。'}elseif($result.reason -eq 'NO_PUBLISHED_RELEASE'){'GitHub暂未提供正式Release。当前版本 '+$result.current_version+'。'}elseif($result.current_version -eq $result.latest_version){'检测完成：当前 '+$result.current_version+' 已是最新正式版本。'}else{'检测完成：当前 '+$result.current_version+' 高于GitHub已发布版本 '+$result.latest_version+'，无需降级。'}
  Update-Hint $text
- if($dialog -and $dialog.IsVisible){$dialog.FindName('CheckUpdateAgain').IsEnabled=$true;$dialog.FindName('DownloadUpdate').IsEnabled=[bool]$result.available;$dialog.FindName('InstallUpdate').IsEnabled=[bool]($result.available -and $result.installed -and $script:downloadState.version -eq $result.latest_version)}
+ if($dialog -and $dialog.IsVisible){$dialog.FindName('CheckUpdateAgain').IsEnabled=$true;$dialog.FindName('DownloadUpdate').IsEnabled=[bool]$result.available;$dialog.FindName('InstallUpdate').IsEnabled=[bool]($result.available -and $result.installed -and $script:downloadState.version -eq $result.latest_version);if($result.available -and $script:downloadState.version -eq $result.latest_version){Apply-UpdateDownload $script:downloadState}}
 }
 function Apply-UpdateDownload($result){
  $script:downloadState=$result;$dialog=$script:updateDialog
+ Apply-DownloadProgress ([pscustomobject]@{status='update_progress';version=$result.version;phase='ready';received_bytes=$result.bytes;total_bytes=$result.bytes;percent=100;speed_bytes_per_second=$null;eta_seconds=$null})
  Update-Hint ('版本 '+$result.version+' 下载完成，文件大小与SHA-256校验通过。'+$(if($script:updateState.installed){'点击“安装更新”继续。'}else{'当前为源码/便携目录，请打开下载目录，在独立目录安装。'}))
  if($dialog -and $dialog.IsVisible){$dialog.FindName('CheckUpdateAgain').IsEnabled=$true;$dialog.FindName('DownloadUpdate').IsEnabled=$true;$dialog.FindName('OpenDownload').IsEnabled=$true;$dialog.FindName('InstallUpdate').IsEnabled=[bool]$script:updateState.installed}
 }
@@ -55,7 +77,7 @@ function Show-Update {
  $dialog.FindName('CheckUpdateAgain').Add_Click({Begin-UpdateCheck})
  $dialog.FindName('DownloadUpdate').Add_Click({
   if(-not $script:updateState.available){return}
-  if(Begin-JobCommand @{action='download-update';name='';version=$script:updateState.latest_version}){$this.IsEnabled=$false;$script:updateDialog.FindName('CheckUpdateAgain').IsEnabled=$false;Update-Hint '正在下载安装包并校验，请稍候。关闭此窗口不会取消下载。'}
+  if(Begin-JobCommand @{action='download-update';name='';version=$script:updateState.latest_version}){$script:downloadState=$null;$this.IsEnabled=$false;$script:updateDialog.FindName('OpenDownload').IsEnabled=$false;$script:updateDialog.FindName('InstallUpdate').IsEnabled=$false;$script:updateDialog.FindName('CheckUpdateAgain').IsEnabled=$false;Apply-DownloadProgress ([pscustomobject]@{status='update_progress';phase='connecting';received_bytes=0;total_bytes=$script:updateState.asset.size;percent=0});Update-Hint '正在下载安装包并校验，请稍候。关闭此窗口不会取消下载。'}
  })
  $dialog.FindName('OpenDownload').Add_Click({if($script:downloadState.file){Start-Process -FilePath explorer.exe -ArgumentList ('/select,"'+$script:downloadState.file+'"') -WindowStyle Normal}})
  $dialog.FindName('InstallUpdate').Add_Click({
@@ -63,10 +85,12 @@ function Show-Update {
   $answer=[Windows.MessageBox]::Show($script:updateDialog,'将停止此安装目录的空闲服务、关闭管理器并打开安装向导。安装完成后恢复这些服务；其他目录的服务不受影响。继续安装？','安装更新',[Windows.MessageBoxButton]::YesNo,[Windows.MessageBoxImage]::Question,[Windows.MessageBoxResult]::No)
   if($answer -eq [Windows.MessageBoxResult]::Yes){$script:installPending=$true;$this.IsEnabled=$false;Update-Hint '正在等待当前管理操作结束，随后检查空闲服务并准备安装…'}
  })
- Begin-UpdateCheck
+ $active=@($script:jobs|Where-Object {$_.Action -eq 'download-update'})
+ if($active.Count){$dialog.FindName('CheckUpdateAgain').IsEnabled=$false;$dialog.FindName('DownloadUpdate').IsEnabled=$false;$dialog.Add_ContentRendered({if($script:downloadProgress){Apply-DownloadProgress $script:downloadProgress}});Update-Hint '正在下载安装包并校验。关闭此窗口不会取消下载。'}else{Begin-UpdateCheck}
  [void]$dialog.ShowDialog();$script:updateDialog=$null
 }
-function Fail-Update([string]$message){
+function Fail-Update([string]$message,[string]$action=''){
  Update-Hint $message;$script:installPending=$false
+ if($script:updateDialog -and $script:downloadProgress -and $action -eq 'download-update'){$script:updateDialog.FindName('DownloadStage').Text='下载或校验未完成，请重试'}
  if($script:updateDialog -and $script:updateDialog.IsVisible){$dialog=$script:updateDialog;$dialog.FindName('CheckUpdateAgain').IsEnabled=$true;$dialog.FindName('DownloadUpdate').IsEnabled=[bool]$script:updateState.available;$dialog.FindName('InstallUpdate').IsEnabled=[bool]($script:updateState.installed -and $script:downloadState)}
 }

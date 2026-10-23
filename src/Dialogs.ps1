@@ -1,5 +1,5 @@
-﻿function Read-Dialog([string]$source){
- $dialog=[Windows.Markup.XamlReader]::Load([Xml.XmlNodeReader]::new([xml]$source));if($script:window.IsLoaded){$dialog.Owner=$script:window}
+﻿function Read-Dialog([xml]$source){
+ $dialog=[Windows.Markup.XamlReader]::Load([Xml.XmlNodeReader]::new($source));if($script:window.IsLoaded){$dialog.Owner=$script:window}
  $dialog.Resources.MergedDictionaries.Add($script:window.Resources)
  if($script:window.Icon){$dialog.Icon=$script:window.Icon};return $dialog
 }

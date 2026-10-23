@@ -29,6 +29,22 @@ test('unsafe redirects, size/hash mismatch and interrupted streams cannot produc
 test('download refuses linked version directories and linked installer files',async()=>{
  const root=path.join(temporary,'links'),outside=path.join(temporary,'outside');await fs.mkdir(root);await fs.mkdir(outside);await fs.symlink(outside,path.join(root,'1.4.0'),process.platform==='win32'?'junction':'dir');await assert.rejects(downloadUpdate(selected(),root,{fetchImpl:async()=>new Response(payload)}),/UPDATE_PATH_REJECTED/);
 });
+test('download reports actual bytes and verification before reaching 100 percent',async()=>{
+ const values=[],root=path.join(temporary,'progress');let offset=0,time=0;
+ const stream=new ReadableStream({pull(controller){if(offset===payload.length){controller.close();return;}const end=Math.min(offset+5,payload.length);controller.enqueue(payload.subarray(offset,end));offset=end;time+=250;}});
+ const result=await downloadUpdate(selected(),root,{now:()=>time,fetchImpl:async()=>new Response(stream),onProgress:async value=>{values.push(value);if(value.phase==='ready')assert.equal((await fs.stat(path.join(root,'1.4.0',selected().asset.name))).size,payload.length);else assert.ok(value.percent<100);}});
+ assert.equal(values[0].phase,'connecting');assert.equal(values.at(-2).phase,'verifying');assert.equal(values.at(-1).phase,'ready');assert.equal(values.at(-1).percent,100);assert.equal(values.at(-1).received_bytes,result.bytes);
+ assert.ok(values.some(x=>x.phase==='downloading'&&x.received_bytes>0&&x.received_bytes<payload.length));assert.ok(values.every((x,i)=>!i||x.received_bytes>=values[i-1].received_bytes));
+ const cached=[];await downloadUpdate(selected(),root,{fetchImpl:async()=>{throw Error('unexpected network');},onProgress:async x=>cached.push(x)});assert.equal(cached.at(-1).phase,'ready');
+});
+test('failed or interrupted downloads never report verified completion',async()=>{
+ for(const name of ['bad-hash','broken-stream']){
+  const values=[],root=path.join(temporary,name);
+  const body=name==='bad-hash'?new Response(Buffer.alloc(payload.length)):new Response(new ReadableStream({start(c){c.enqueue(payload.subarray(0,5));c.error(Error('interrupted'));}}));
+  await assert.rejects(downloadUpdate(selected(),root,{fetchImpl:async()=>body,onProgress:async x=>values.push(x)}));
+  assert.ok(!values.some(x=>x.phase==='ready'||x.percent===100));assert.deepEqual(await fs.readdir(path.join(root,'1.4.0')),[]);
+ }
+});
 test('GitHub API rate limits fall back to the fixed public release with repository checks',async()=>{
  const calls=[];const value=await checkUpdate('1.3.0',{fetchImpl:async(url,options)=>{
   calls.push({url,method:options.method||'GET'});
@@ -44,13 +60,22 @@ test('Windows install handoff independently rejects changed installer bytes and 
  const script=fileURLToPath(new URL('../src/ApplyUpdate.ps1',import.meta.url));const invoke=()=>spawnSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-JobFile',job,'-SelfTest'],{encoding:'utf8',windowsHide:true});
  const valid=invoke();assert.equal(valid.status,0,valid.stdout+valid.stderr);await fs.writeFile(result.file,Buffer.alloc(payload.length));const changed=invoke();assert.equal(changed.status,1);assert.match(changed.stdout,/UPDATE_HASH_MISMATCH/);
 });
+test('hidden Windows helper executes and survives the controller exiting',{skip:process.platform!=='win32'},async()=>{
+ const root=path.join(temporary,"helper lifetime's folder");await fs.mkdir(root);const script=path.join(root,'Probe.ps1'),parent=path.join(root,'parent.mjs'),done=path.join(root,'parent-exited'),marker=path.join(root,'helper-survived');
+ await fs.writeFile(script,'param([string]$JobFile)\n[IO.File]::WriteAllText($JobFile+".ready","ready");for($i=0;$i -lt 100;$i++){if([IO.File]::Exists($env:CLAWBOT_TEST_PARENT_EXIT)){[IO.File]::WriteAllText($env:CLAWBOT_TEST_HELPER_MARKER,"survived");exit 0};Start-Sleep -Milliseconds 50};exit 2');
+ await fs.writeFile(parent,'import fs from "node:fs/promises";import {launchUpdateHelper} from '+JSON.stringify(new URL('../src/update-launch.mjs',import.meta.url).href)+';const job='+JSON.stringify(done)+';const child=launchUpdateHelper('+JSON.stringify(script)+',job,'+JSON.stringify(root)+');for(let i=0;i<100;i++){if(await fs.access(job+".ready").then(()=>true,()=>false))break;if(i===99)throw Error("helper never ready");await new Promise(r=>setTimeout(r,50));}child.unref();');
+ const result=spawnSync(process.execPath,[parent],{env:{...process.env,CLAWBOT_TEST_PARENT_EXIT:done,CLAWBOT_TEST_HELPER_MARKER:marker},encoding:'utf8',windowsHide:true,timeout:10000});assert.equal(result.status,0,result.stderr);await fs.writeFile(done,'exited');
+ for(let i=0;i<80;i++){if(await fs.access(marker).then(()=>true,()=>false))break;await new Promise(r=>setTimeout(r,50));}
+ assert.equal(await fs.readFile(marker,'utf8'),'survived');
+});
 test('Windows handoff waits for manager exit, executes the verified installer and records its result',{skip:process.platform!=='win32'},async()=>{
  const root=path.join(temporary,'full-handoff');await fs.mkdir(root);const app=path.join(root,'app');await fs.mkdir(app);const jobs=path.join(root,'jobs');await fs.mkdir(jobs);
  const source=path.join(root,'Fixture.cs');await fs.writeFile(source,'using System;using System.IO;static class Fixture{[STAThread]static void Main(string[] args){File.AppendAllText(Environment.GetEnvironmentVariable("CLAWBOT_TEST_MARKER"),string.Join("|",args)+Environment.NewLine);}}');
  const installer=path.join(root,release().assets[0].name),compiler=path.join(process.env.SystemRoot,'Microsoft.NET/Framework64/v4.0.30319/csc.exe');
  const compiled=spawnSync(compiler,['/nologo','/target:winexe','/out:'+installer,source],{encoding:'utf8',windowsHide:true});assert.equal(compiled.status,0,compiled.stdout+compiled.stderr);
  await fs.copyFile(installer,path.join(app,'ClawBot实例管理器.exe'));const data=await fs.readFile(installer),marker=path.join(root,'invoked.txt'),job=path.join(root,'full.json');
- await fs.writeFile(job,JSON.stringify({download_root:await fs.realpath(root),installer:await fs.realpath(installer),bytes:data.length,sha256:createHash('sha256').update(data).digest('hex'),manager_pid:2147483647,app_root:app,resume_instances:[],jobs_directory:jobs}));
+ const guard=path.join(root,'SetupGuard.exe');const guardSource=fileURLToPath(new URL('../installer/SetupGuard.cs',import.meta.url));const guardBuild=spawnSync(compiler,['/nologo','/reference:System.Management.dll','/out:'+guard,guardSource],{encoding:'utf8',windowsHide:true});assert.equal(guardBuild.status,0,guardBuild.stdout+guardBuild.stderr);
+ await fs.writeFile(job,JSON.stringify({download_root:await fs.realpath(root),installer:await fs.realpath(installer),bytes:data.length,sha256:createHash('sha256').update(data).digest('hex'),manager_pid:2147483647,guard,app_root:app,resume_instances:[],jobs_directory:jobs}));
  const script=fileURLToPath(new URL('../src/ApplyUpdate.ps1',import.meta.url));const result=spawnSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-JobFile',job,'-NonInteractive'],{env:{...process.env,CLAWBOT_TEST_MARKER:marker},encoding:'utf8',windowsHide:true,timeout:15000});
  assert.equal(result.status,0,result.stdout+result.stderr);const report=JSON.parse(await fs.readFile(job+'.result.json','utf8'));assert.equal(report.exit_code,0);assert.deepEqual(report.resume_failed,[]);assert.match(await fs.readFile(marker,'utf8'),/\/DIR=/);
 });

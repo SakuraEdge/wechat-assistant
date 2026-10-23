@@ -58,15 +58,20 @@ begin
     (Pos(Lowercase(AddBackslash(AddBackslash(GetEnv('USERPROFILE')) + '.codex')), Lowercase(AddBackslash(Directory))) <> 1);
 end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
-var Code: Integer;
+var Code, I: Integer; Details: TArrayOfString; ReportFile: String;
 begin
   Result := '';
   if not IsInstallDirectorySafe(ExpandConstant('{app}')) then begin
     Result := '请选择独立的软件安装文件夹，不能直接使用用户目录或Codex数据目录。'; exit;
   end;
   ExtractTemporaryFile('SetupGuard.exe');
-  if not Exec(ExpandConstant('{tmp}\SetupGuard.exe'), '"' + ExpandConstant('{app}') + '"', '', SW_HIDE, ewWaitUntilTerminated, Code) then Code := 43;
-  if Code <> 0 then Result := '此安装目录仍有管理窗口或后台服务运行，或无法核对进程。请在管理器中等待工作完成、停止服务并关闭窗口，再重试。安装器不会自动中断任务。';
+  ReportFile := ExpandConstant('{tmp}\clawbot-processes.txt');
+  if not Exec(ExpandConstant('{tmp}\SetupGuard.exe'), '"' + ExpandConstant('{app}') + '" --details "' + ReportFile + '"', '', SW_HIDE, ewWaitUntilTerminated, Code) then Code := 43;
+  if Code = 42 then begin
+    Result := '安装目录仍被进程使用。请等待工作完成、停止服务并关闭对应管理窗口，再重试。安装器不会中断任务。';
+    if LoadStringsFromFile(ReportFile, Details) then
+      for I := 0 to GetArrayLength(Details) - 1 do Result := Result + #13#10 + Details[I];
+  end else if Code <> 0 then Result := '无法核对安装目录的进程状态。请检查当前Windows用户的访问权限后重试（检查代码43）。';
 end;
 function InitializeUninstall(): Boolean;
 var Code: Integer;

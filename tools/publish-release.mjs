@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';import path from 'node:path';import {fileURLToPath} from 'node:url';import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';import os from 'node:os';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),repository='SakuraEdge/wechat-assistant';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 export async function publishRelease({token,commit,progress=()=>{}}){
@@ -14,6 +15,8 @@ export async function publishRelease({token,commit,progress=()=>{}}){
  const body=await fs.readFile(path.join(root,'docs','release-'+tag+'.md'),'utf8');
  let release=(await api('/repos/'+repository+'/releases?per_page=100')).find(x=>x.tag_name===tag);
  if(release&&!release.draft){for(const asset of assets){const remoteAsset=release.assets.find(x=>x.name===asset.name);if(remoteAsset?.digest!=='sha256:'+asset.sha256||remoteAsset.size!==asset.bytes)throw Error('PUBLISHED_RELEASE_IS_IMMUTABLE');}return {status:'already_published',url:release.html_url,tag,commit};}
+ const scanRoot=await fs.mkdtemp(path.join(os.tmpdir(),'clawbot-publish-scan-'));
+ try{const scan=spawnSync('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(root,'tools/scan-release.ps1'),'-Directory',directory,'-ReportFile',path.join(scanRoot,'report.json')],{encoding:'utf8',windowsHide:true,timeout:300000});if(scan.status!==0)throw Error('RELEASE_SECURITY_SCAN_BLOCKED');}finally{await fs.rm(scanRoot,{recursive:true,force:true});}
  if(release&&release.target_commitish!==commit)throw Error('DRAFT_TARGET_MISMATCH');
  if(!release){release=await api('/repos/'+repository+'/releases',{method:'POST',body:{tag_name:tag,target_commitish:commit,name:'ClawBot实例管理器 '+tag+' · Windows 一键安装版',body,draft:true,prerelease:false}});progress({status:'draft_created',id:release.id,tag});}
  const uploadBase=new URL(release.upload_url.replace(/\{.*$/,''));if(uploadBase.origin!=='https://uploads.github.com'||!uploadBase.pathname.startsWith('/repos/'+repository+'/'))throw Error('INVALID_ASSET_UPLOAD_URL');

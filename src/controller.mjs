@@ -7,6 +7,7 @@ import {setupStatus} from './setup-status.mjs';
 import {instancePaths,instanceDataDirectory} from '../runtime/skills/wechat-dialog/scripts/instance-paths.mjs';
 import {normalizeUsage} from './account-usage.mjs';
 import {checkUpdate,downloadUpdate,verifyInstaller,updateDirectory} from './updates.mjs';
+import {launchUpdateHelper} from './update-launch.mjs';
 
 export const appRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const {version:appVersion}=JSON.parse(await fs.readFile(path.join(appRoot,'package.json'),'utf8'));
@@ -65,30 +66,32 @@ export async function snapshot(){
   return {status:'ok',version:appVersion,default_persona,notification_recipient:'primary',instances,next_name:instances.some(i=>i.name==='primary')?'user-'+next:'primary',at:new Date().toISOString()};
 }
 async function installed(){const manifest=await json(path.join(appRoot,'install-manifest.json'));return !!(manifest?.platform==='windows-x64'&&manifest.version===appVersion&&await fs.access(path.join(appRoot,'unins000.exe')).then(()=>true,()=>false));}
-async function updateAction(input){
+async function updateAction(input,{onProgress}={}){
  const update=await checkUpdate(appVersion);
  if(input.action==='check-update')return {...update,installed:await installed()};
  if(!update.available||update.latest_version!==input.version)throw Error('UPDATE_CHANGED_RECHECK');
  const root=path.join(manager,'updates');
- if(input.action==='download-update')return downloadUpdate(update,root);
+ if(input.action==='download-update')return downloadUpdate(update,root,{onProgress});
  if(!await installed())throw Error('UPDATE_INSTALLER_ONLY');
  if(!Number.isSafeInteger(input.manager_pid)||input.manager_pid<=0)throw Error('UPDATE_MANAGER_INVALID');
+ if(!/^[0-9]{15,19}$/.test(input.manager_start_ticks||''))throw Error('UPDATE_MANAGER_INVALID');
  const directory=await updateDirectory(root,update.latest_version),file=path.join(directory,update.asset.name);
  await verifyInstaller(file,update.asset,root);
  const instances=[];for(const item of (await snapshot()).instances){const c=await config(item.name),s=await current(c);if(s.running)instances.push({c,s});}
  const processes=await run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(appRoot,'src','update-processes.ps1'),'-AppRoot',appRoot,'-ProcessIds',instances.map(item=>item.s.pid).join(',')]);
  const owned=instances.filter(item=>processes.processes.some(proc=>proc.pid===item.s.pid&&proc.owned));
  if(owned.some(item=>isBusy(item.s)))throw Error('INSTANCE_BUSY');
- const stopped=[];let child;
+ const stopped=[];let child,job;
  try{
   for(const item of owned){stopped.push(item.c.name);await stop(item.c,{requireIdle:true});}
   const script=path.join(directory,'ApplyUpdate.ps1');await fs.copyFile(path.join(appRoot,'src','ApplyUpdate.ps1'),script);
-  const job=path.join(directory,randomBytes(16).toString('hex')+'.json'),jobs=path.join(manager,'jobs');await fs.mkdir(jobs,{recursive:true});
-  await fs.writeFile(job,JSON.stringify({installer:file,download_root:await fs.realpath(root),sha256:update.asset.sha256,bytes:update.asset.size,manager_pid:input.manager_pid,app_root:appRoot,resume_instances:stopped,jobs_directory:jobs}));
-  child=spawn('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',script,'-JobFile',job],{cwd:directory,windowsHide:true,detached:true,stdio:'ignore'});let failed=false;child.on('error',()=>{failed=true;});
+  const guard=path.join(directory,'SetupGuard.exe');await fs.copyFile(path.join(appRoot,'installer','SetupGuard.exe'),guard);
+  job=path.join(directory,randomBytes(16).toString('hex')+'.json');const jobs=path.join(manager,'jobs');await fs.mkdir(jobs,{recursive:true});
+  await fs.writeFile(job,JSON.stringify({installer:file,download_root:await fs.realpath(root),sha256:update.asset.sha256,bytes:update.asset.size,manager_pid:input.manager_pid,manager_start_ticks:input.manager_start_ticks,guard,app_root:appRoot,resume_instances:stopped,jobs_directory:jobs}));
+  child=launchUpdateHelper(script,job,directory);let failed=false;child.on('error',()=>{failed=true;});
   const deadline=Date.now()+10000;while(!failed&&Date.now()<deadline){if(await fs.access(job+'.ready').then(()=>true,()=>false)){child.unref();return {status:'update_handoff',version:update.latest_version};}if(await fs.access(job+'.error.json').then(()=>true,()=>false))break;await delay(100);}
   throw Error('UPDATE_HANDOFF_FAILED');
- }catch(error){if(child&&!child.killed)child.kill();for(const name of stopped){try{await invoke(await config(name),['start']);}catch{}}throw error;}
+ }catch(error){if(job)await fs.writeFile(job+'.cancel','cancel').catch(()=>{});if(child&&!child.killed)child.kill();for(const name of stopped){try{await invoke(await config(name),['start']);}catch{}}throw error;}
 }
 async function withClient(callback){
  const {SecureStore,RpcClient}=await import(pathToFileURL(path.join(scripts,'core.mjs')));
@@ -118,10 +121,10 @@ async function create(input){
   const labels=await json(path.join(manager,'labels.json'),{});labels[name]=label;await fs.mkdir(manager,{recursive:true});await fs.writeFile(path.join(manager,'labels.json'),JSON.stringify(labels,null,2));
   const c=await config(name);await prepare(c);return {status:'created',name,workspace};
 }
-export async function execute(input){
+export async function execute(input,options={}){
   if(!input||typeof input!=='object')throw Error('INVALID_REQUEST');
   if(input.action==='snapshot')return snapshot();
-  if(['check-update','download-update','install-update'].includes(input.action))return updateAction(input);
+  if(['check-update','download-update','install-update'].includes(input.action))return updateAction(input,options);
   if(input.action==='setup-status')return setupStatus(appRoot,await env(),{verifyClient:input.verify?()=>withClient(rpc=>rpc.request('model/list',{includeHidden:false,limit:1},20000)):null});
   if(input.action==='usage'){
     try{return normalizeUsage(await withClient(rpc=>rpc.request('account/rateLimits/read',{},20000)));}
@@ -192,9 +195,10 @@ export async function execute(input){
 async function main(){
   try{
     if(process.platform!=='win32')throw Error('WINDOWS_REQUIRED');
-    let input={action:'snapshot'};const index=process.argv.indexOf('--request');
-    if(index>=0){const file=path.resolve(process.argv[index+1]||'');const jobRoot=path.join(manager,'jobs')+path.sep;if(!file.startsWith(jobRoot)||!/^[a-f0-9]{32}\.json$/.test(path.basename(file)))throw Error('INVALID_REQUEST_FILE');input=await json(file);await fs.unlink(file);}
-    console.log(JSON.stringify(await execute(input)));
+    let input={action:'snapshot'},progressFile;const index=process.argv.indexOf('--request');
+    if(index>=0){const file=path.resolve(process.argv[index+1]||'');const jobRoot=path.join(manager,'jobs')+path.sep;if(!file.startsWith(jobRoot)||!/^[a-f0-9]{32}\.json$/.test(path.basename(file)))throw Error('INVALID_REQUEST_FILE');input=await json(file);progressFile=file+'.progress.json';await fs.unlink(file);}
+    const onProgress=progressFile?async value=>{try{await fs.writeFile(progressFile,JSON.stringify(value));}catch{/* A locked progress file must not abort the verified installer download. */}}:undefined;
+    console.log(JSON.stringify(await execute(input,{onProgress})));
   }catch(error){console.log(JSON.stringify({status:'error',code:/^[A-Z][A-Z0-9_]+$/.test(error.message)?error.message:'MANAGER_LOCAL_ERROR'}));process.exitCode=1;}
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();

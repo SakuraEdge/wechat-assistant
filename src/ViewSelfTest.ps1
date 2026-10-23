@@ -69,3 +69,19 @@ $fixture.instances[1].running=$false;Apply-Snapshot $fixture
 if($script:ui.ServiceHealth.Text -ne '有实例尚未运行'){throw 'SERVICE_STOPPED_STATE_FAILED'}
 $fixture.instances=@();Apply-Snapshot $fixture
 if([string]$script:ui.OverviewEmpty.Visibility -ne 'Visible' -or $script:ui.StatInstances.Text -ne '0' -or (Selected)){throw 'EMPTY_HOME_FAILED'}
+[xml]$xmlDialog='<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="XML object regression"><TextBox Name="Label"/></Window>'
+$xmlWindow=Read-Dialog $xmlDialog
+if($xmlWindow.Title -ne 'XML object regression' -or -not $xmlWindow.FindName('Label')){throw 'XML_OBJECT_DIALOG_FAILED'}
+$xmlWindow.Close()
+$script:updateDialog=New-UpdateDialog
+try{
+ $script:updateDialog.Show()
+ Apply-DownloadProgress ([pscustomobject]@{status='update_progress';phase='downloading';received_bytes=5242880;total_bytes=10485760;percent=50;speed_bytes_per_second=1048576;eta_seconds=5})
+ if($script:updateDialog.FindName('DownloadProgress').Value -ne 50 -or $script:updateDialog.FindName('DownloadMetrics').Text -notlike '*5.0 / 10.0 MiB*'){throw 'DOWNLOAD_PROGRESS_VIEW_FAILED'}
+ $script:updateDialog.Hide()
+ Update-Hint '下载窗口重开后继续显示进度'
+ if($script:updateDialog.FindName('UpdateHint').Text -ne '下载窗口重开后继续显示进度'){throw 'HIDDEN_UPDATE_HINT_FAILED'}
+ Apply-DownloadProgress ([pscustomobject]@{status='update_progress';phase='verifying';received_bytes=10485760;total_bytes=10485760;percent=99.9})
+ $script:updateDialog.Show();Apply-DownloadProgress $script:downloadProgress
+ if($script:updateDialog.FindName('DownloadStage').Text -notlike '*SHA-256*' -or $script:updateDialog.FindName('InstallUpdate').IsEnabled){throw 'DOWNLOAD_VERIFICATION_VIEW_FAILED'}
+}finally{$script:updateDialog.Close();$script:updateDialog=$null}

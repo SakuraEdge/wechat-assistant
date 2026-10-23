@@ -35,8 +35,9 @@ try{
  await fs.mkdir(output,{recursive:true});run(compiler,['/Qp','/DAppVersion='+version,'/DPayloadDir='+payload,'/DOutputDir='+output,'/DNodeSHA256='+pins.node.sha256,path.join(payload,'installer/ClawBot.iss')],payload);
  const zip=path.join(output,'ClawBot-Instance-Manager-'+version+'-windows-x64-portable.zip');
  const compression=spawnSync('powershell.exe',['-NoProfile','-Command','Compress-Archive -LiteralPath $env:CLAWBOT_PAYLOAD -DestinationPath $env:CLAWBOT_ARCHIVE -CompressionLevel Optimal'],{windowsHide:true,env:{...process.env,CLAWBOT_PAYLOAD:payload,CLAWBOT_ARCHIVE:zip},encoding:'utf8',timeout:300000});if(compression.status!==0)throw Error('PORTABLE_COMPRESSION_FAILED');
+ const securityReport=path.join(temporary,'defender-scan.json');run('powershell.exe',['-NoProfile','-ExecutionPolicy','Bypass','-File',path.join(root,'tools/scan-release.ps1'),'-Directory',output,'-ReportFile',securityReport]);
  const assets=[];for(const name of await fs.readdir(output)){const data=await fs.readFile(path.join(output,name));assets.push({name,bytes:data.length,sha256:sha(data)});}
  assets.sort((a,b)=>a.name.localeCompare(b.name));const checksum=assets.map(item=>item.sha256+'  '+item.name).join('\n')+'\n';await fs.writeFile(path.join(output,'SHA256SUMS.txt'),checksum);
  const manifest=path.join(output,'install-manifest.json');await fs.copyFile(path.join(payload,'install-manifest.json'),manifest);assets.push({name:'SHA256SUMS.txt',bytes:Buffer.byteLength(checksum),sha256:sha(Buffer.from(checksum))},{name:'install-manifest.json',bytes:(await fs.stat(manifest)).size,sha256:sha(await fs.readFile(manifest))});
- console.log(JSON.stringify({status:'built',version,output,payload,assets,files:files.length,node_version:pins.node.version}));
+ console.log(JSON.stringify({status:'built',version,output,payload,assets,files:files.length,node_version:pins.node.version,security_report:securityReport}));
 }catch(error){console.log(JSON.stringify({status:'error',code:/^[A-Z0-9_]+$/.test(error.message)?error.message:'RELEASE_BUILD_FAILED',...(error.step?{step:error.step,diagnostics:error.diagnostics}: {})}));process.exitCode=1;}

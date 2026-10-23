@@ -14,7 +14,7 @@ $script:jobs=[Collections.ArrayList]::new()
 $script:setupRequested=$false;$script:setupShown=$false;$script:setupState=$null;$script:setupDialog=$null
 $script:snapshotLoaded=$false;$script:addAfterSetup=$false;$script:usageState=$null;$script:lastUsage=[datetime]::MinValue
 $script:setupVerifyRequested=$false
-$script:updateState=$null;$script:downloadState=$null;$script:updateDialog=$null;$script:installPending=$false
+$script:updateState=$null;$script:downloadState=$null;$script:downloadProgress=$null;$script:updateDialog=$null;$script:installPending=$false
 $script:rows=@();$script:selection='';$script:lastRefresh=[datetime]::MinValue;$script:catalog=@();$script:modelsRequested=$false;$script:bindingModel=$false;$script:bindingSelection=$false;$script:currentPage='overview'
 $script:errors=@{
  INSTANCE_REGISTRY_AMBIGUOUS='检测到多份实例登记目录，已暂停自动选择。请在Codex中检查并指定原有实例目录，勿重新扫码覆盖。'
@@ -138,7 +138,7 @@ function Begin-JobCommand($request){
  $start.UseShellExecute=$false;$start.CreateNoWindow=$true;$start.RedirectStandardOutput=$true;$start.RedirectStandardError=$true
  $start.StandardOutputEncoding=[Text.UTF8Encoding]::new($false)
  $proc=[Diagnostics.Process]::Start($start)
- $job=[pscustomobject]@{Action=$request.action;Name=$request.name;UserFeedback=[bool]$request.user_feedback;Process=$proc;Output=$proc.StandardOutput.ReadToEndAsync();Error=$proc.StandardError.ReadToEndAsync();Started=[datetime]::UtcNow;QrWindow=$null;QrImage=$null;QrHint=$null;QrStamp=[datetime]::MinValue}
+ $job=[pscustomobject]@{Action=$request.action;Name=$request.name;ProgressFile=($file+'.progress.json');UserFeedback=[bool]$request.user_feedback;Process=$proc;Output=$proc.StandardOutput.ReadToEndAsync();Error=$proc.StandardError.ReadToEndAsync();Started=[datetime]::UtcNow;QrWindow=$null;QrImage=$null;QrHint=$null;QrStamp=[datetime]::MinValue}
  [void]$script:jobs.Add($job)
  if(-not $readOnly){Say ('正在执行：'+$request.action+' · '+$request.name+'。窗口可以继续使用。')}
  if($request.action -eq 'connect'){Show-Qr $job}
@@ -334,23 +334,24 @@ $script:timer.Add_Tick({
  try{
   foreach($job in @($script:jobs.ToArray())){
    if($job.Action -eq 'connect'){Update-Qr $job}
+   if($job.Action -eq 'download-update'){Read-DownloadProgress $job}
    if(-not $job.Process.HasExited){continue};if(-not $job.Output.IsCompleted -or -not $job.Error.IsCompleted){continue}
    $text=$job.Output.Result;$result=$null
    foreach($line in ($text -split "`r?`n")){if($line.Trim().StartsWith('{')){try{$result=$line|ConvertFrom-Json}catch{}}}
    if($job.QrWindow){$job.QrWindow.Close()}
-   [void]$script:jobs.Remove($job);$job.Process.Dispose()
+   [void]$script:jobs.Remove($job);$job.Process.Dispose();if([IO.File]::Exists($job.ProgressFile)){try{[IO.File]::Delete($job.ProgressFile)}catch{}}
    if(-not $result -or $result.status -eq 'error'){
     $code=if($result.code){$result.code}else{'LOCAL_OPERATION_FAILED'};$detail=if($script:errors.ContainsKey($code)){$script:errors[$code]}else{'操作未完成：'+$code}
     if($job.Action -eq 'history' -and $script:chatWindows.ContainsKey($job.Name)){$script:chatWindows[$job.Name].Window.FindName('Hint').Text=$detail}elseif($job.Action -eq 'setup-status'){
      Complete-SetupCheck ([pscustomobject]@{ready=$false;prompt='';connection_error=$code;checked_at=[datetime]::UtcNow;bundled_node=$false;node_version='';client_verified=$false}) $job.UserFeedback
     }elseif($job.Action -eq 'usage'){$script:ui.RefreshUsage.IsEnabled=$true;$script:ui.RefreshUsage.Content='刷新额度';$script:ui.UsageHint.Text='读取额度失败，请稍后刷新。';Say $detail $true
-    }elseif($job.Action -like '*update'){Fail-Update $detail}else{Say $detail $true}
+    }elseif($job.Action -like '*update'){Fail-Update $detail $job.Action}else{Say $detail $true}
    }elseif($job.Action -eq 'snapshot'){Apply-Snapshot $result
    }elseif($job.Action -eq 'setup-status'){Complete-SetupCheck $result $job.UserFeedback
    }elseif($job.Action -eq 'usage'){Apply-Usage $result
    }elseif($job.Action -eq 'check-update'){Apply-UpdateCheck $result
    }elseif($job.Action -eq 'download-update'){Apply-UpdateDownload $result
-   }elseif($job.Action -eq 'install-update' -and $result.status -eq 'update_handoff'){if($script:updateDialog){$script:updateDialog.Close()};$script:window.Close();return
+   }elseif($job.Action -eq 'install-update' -and $result.status -eq 'update_handoff'){$global:ClawBotUpdateHandoff=$true;if($script:updateDialog){$script:updateDialog.Close()};$script:window.Close();return
    }elseif($job.Action -eq 'history'){Apply-History $result
    }elseif($job.Action -eq 'models'){$script:catalog=@($result.models);Load-ModelChoice (Selected);Say ('已从客户端读取 '+$script:catalog.Count+' 个可用模型及各自推理强度。')
    }else{
@@ -361,7 +362,7 @@ $script:timer.Add_Tick({
     if($job.Action -eq 'create'){Begin-JobCommand @{action='connect';name=$job.Name}}
    }
   }
-  if($script:installPending){if(-not $script:jobs.Count){$script:installPending=$false;[void](Begin-JobCommand @{action='install-update';name='';version=$script:downloadState.version;manager_pid=$PID})};return}
+  if($script:installPending){if(-not $script:jobs.Count){$script:installPending=$false;[void](Begin-JobCommand @{action='install-update';name='';version=$script:downloadState.version;manager_pid=$PID;manager_start_ticks=([Diagnostics.Process]::GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString())})};return}
   if(@($script:jobs|Where-Object {$_.Action -eq 'install-update'}).Count){return}
   if(([datetime]::UtcNow-$script:lastRefresh).TotalSeconds -ge 4 -and -not @($script:jobs|Where-Object {$_.Action -eq 'snapshot'}).Count){$script:lastRefresh=[datetime]::UtcNow;Begin-JobCommand @{action='snapshot';name=''}}
   foreach($name in @($script:chatWindows.Keys)){$entry=$script:chatWindows[$name];if(([datetime]::UtcNow-$entry.LastRefresh).TotalSeconds -ge 4){$entry.LastRefresh=[datetime]::UtcNow;[void](Begin-JobCommand @{action='history';name=$name})}}
