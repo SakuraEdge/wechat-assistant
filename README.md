@@ -11,11 +11,11 @@
 | Windows 10 / 11 x64 | 已提供 EXE 安装包与内置运行环境便携包 | [下载最新 Release](https://github.com/SakuraEdge/wechat-assistant/releases/latest) |
 | macOS / Linux | 计划中，当前不能运行此 Windows 界面 | 后续按实际适配进展更新本页 |
 
-推荐下载 [v1.3.0 Windows 安装包](https://github.com/SakuraEdge/wechat-assistant/releases/download/v1.3.0/ClawBot-Instance-Manager-Setup-1.3.0-windows-x64.exe)，双击按向导安装。安装包内置经过SHA-256核对的Node.js 24.16.0及扫码依赖，无需手动安装Node/npm、运行命令或编译。
+推荐下载 [v1.4.0 Windows 安装包](https://github.com/SakuraEdge/wechat-assistant/releases/download/v1.4.0/ClawBot-Instance-Manager-Setup-1.4.0-windows-x64.exe)，双击按向导安装。安装包内置经过SHA-256核对的Node.js 24.16.0及扫码依赖，无需手动安装Node/npm、运行命令或编译。
 
 [Release 下载页](https://github.com/SakuraEdge/wechat-assistant/releases/latest)同时提供便携ZIP、文件清单和SHA256SUMS.txt。当前安装包未添加发布者代码签名，可核对Release中的SHA-256；软件不附带Codex账号或模型额度。
 
-当前源码版本为 **v1.4.0**，包含浅色淡紫侧栏和首页额度卡片；公开安装包仍以Release页实际提供的最新正式版为准。源码版本高于安装版时，管理器不会自动降级，也不会把未发布的源码版本描述成已发布安装包。
+当前版本为 **v1.4.0**，包含浅色淡紫侧栏、首页额度卡片和更清晰的实例操作；提供Windows x64安装包及便携ZIP，公开状态以对应Release页面为准。源码版本高于安装版时，管理器不会自动降级，也不会把未发布的源码版本描述成已发布安装包。
 
 需要源码时，可在[源码仓库](https://github.com/SakuraEdge/wechat-assistant)点击 **Code → Download ZIP**，或运行：
 
@@ -25,7 +25,7 @@ git clone https://github.com/SakuraEdge/wechat-assistant.git
 
 ## 安装包首次使用（推荐）
 
-1. 下载并双击 **ClawBot-Instance-Manager-Setup-1.3.0-windows-x64.exe**，按向导点击安装。默认安装到当前用户的`%LOCALAPPDATA%\Programs\ClawBotInstanceManager`，无需管理员权限，不修改系统PATH。
+1. 下载并双击 **ClawBot-Instance-Manager-Setup-1.4.0-windows-x64.exe**，按向导点击安装。默认安装到当前用户的`%LOCALAPPDATA%\Programs\ClawBotInstanceManager`，无需管理员权限，不修改系统PATH。
 2. 安装完成打开管理器。首次引导按步骤提示：打开并登录Codex → **复制连接提示** → 在Codex对话中粘贴发送 → 等助手明确说初始化完成。
 3. 回到管理器点击 **重新检测连接**。按钮会立即显示“正在检测”，完成后显示带时间的结果气泡并弹出结果提示；失败时按提示重新初始化。检测会实际请求客户端模型接口，首次引导不会阻塞后台检测。
 4. 检测通过后点击 **下一步：新增微信用户**，填写名称，再本人微信扫码；也可返回主界面点击 **新增微信用户**。连接Codex不等于已经新增或绑定微信。第一位为`primary`主用户，后续每人独立新增、独立扫码。发送“你好”核对回复后即可安排工作。
@@ -187,6 +187,8 @@ powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File src/Manager.ps1 -Se
 认证、队列、临时二维码和工作数据位于本机 `%LOCALAPPDATA%/Codex/`，不会随仓库上传。构建产物、依赖与本地部署包已忽略；换电脑需重新初始化、扫码，不复制 DPAPI 登录数据。
 
 ## 更新记录
+
+- **2026-10-23 · v1.4.0发行更新**：提供新版界面的Windows安装器、内置运行时便携包、安装文件清单和SHA-256校验文件；浅色淡紫五页导航、首页共享额度、放大的聊天/更多操作及菜单刷新保持。安装与卸载保留用户目录数据，详细验证与适用平台见[发行说明](docs/release-v1.4.0.md)。
 
 - **2026-10-22 · v1.4.0源码候选**：管理器按确认的效果图采用浅色淡紫界面，五页侧栏；五小时与每周额度直接显示在首页，实例列表提供聊天和更多操作；按钮热区、字号、对比、额度卡片和菜单高亮进一步加强。只有实例相关页面显示选择条；刷新保留未变化的行，避免打断菜单。模型接口暂不可用时仍显示当前配置。正式安装包与Release尚未发布，详见[版本说明](docs/release-v1.4.0.md)。
 
