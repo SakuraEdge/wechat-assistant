@@ -19,7 +19,7 @@
 | 可视化管理 | Windows WPF界面，浅色淡紫主题，首页、实例与服务、模型与人设、权限与能力、软件更新五页；首页直接显示共享额度与精简实例表，行内聊天/更多操作绑定实际实例，选择条仅在实例页面显示，原扫码、启停、权限、模型、人设、聊天与目录操作保留 | Manager.ps1、Dialogs.ps1、Dashboard.ps1；五页WPF加载、行内事件和三档尺寸回归；实际窗口核对，详见docs/VERIFICATION.md |
 | 桌面启动读取原实例 | 自动发现同一Windows用户普通目录或Codex应用专用目录的实例登记；逻辑/物理别名去重，只映射旧默认数据路径，保留自定义目录；多份登记报冲突，不合并身份、不复制认证 | instance-paths.mjs、desktop-connection.mjs、wechat-instance.ps1；桌面真机重开显示两个原实例，动态模型与原聊天可读 |
 | 独立软件包 | 双击ClawBot实例管理器.exe或打开ClawBot实例管理器.vbs，旧入口兼容；源码、运行快照、模板、文档、构建与审计均在独立目录 | README.md；公开仓库忽略认证、队列、二维码、node_modules、构建产物；平台支持与使用教程见README |
-| 管理器内聊天 | 所选实例独立只读窗口，每4秒刷新，最多300条近期收发；旧版仅有摘要时明确标注。附件只显示名称；不导出工具/推理/认证 | conversation-log.mjs、Dialogs.ps1；记录随现有DPAPI状态保存 |
+| 管理器内聊天 | 本地LaTeX公式、原文切换与复制；所选实例独立只读窗口，每4秒刷新，最多300条近期收发；旧版仅有摘要时明确标注。附件只显示名称；不导出工具/推理/认证 | conversation-log.mjs、Dialogs.ps1；记录随现有DPAPI状态保存 |
 | 人设与命名 | 每实例独立persona/profile.json与按内容哈希保存的私人图片；默认GPT小姐两形象，可改助手自称和列表备注；不改变模型/角色权限 | persona-profile.mjs；校验格式、大小、数量、真实路径及目录链接 |
 | 程序名称与图标 | ClawBot实例管理器窗口、EXE版本描述和图标统一；旧启动器转新EXE，Node后台进程仍显示运行时名称 | Launcher.cs、LegacyLauncher.cs、assets/clawbot.ico |
 | Windows安装器 | 当前用户无管理员安装、桌面/开始菜单/卸载项、固定Node与扫码依赖；首次向导引导本人Codex连接和微信扫码；运行中拒绝覆盖，不复制账号或改PATH | installer/、tools/build-release.mjs；发布资产附SHA-256与安装清单 |
@@ -30,6 +30,8 @@
 | 迁移与依赖 | 新电脑需Windows、Node24+、已登录运行的Codex；旧机器DPAPI不迁移，微信重新扫码；首用在客户端初始化连接，后续本机可双击 | initialize.ps1、docs/MIGRATION.md；不含模型，不绕过客户端 |
 
 ## 版本与验证
+
+- 2026-10-23 · v1.4.2源码更新：只读聊天改用原生WPF公式文档，支持四类公式定界符及常见矩阵/对齐/分段函数，保护代码与金额；提供原文切换和复制，错误/缺失组件回退原文；固定WPF-Math/XamlMath.Shared 2.1.0与许可，包审计核对字节哈希。自动测试与实际界面验证范围见VERIFICATION.md。本次未发布新Release。
 
 - 2026-10-23 · v1.4.1：真实字节下载进度、速度/剩余时间及校验阶段；安装目录入口脚本匹配、进程释放等待和PID提示；更新助手改由独立隐藏PowerShell启动，准备失败可取消交接；Read-Dialog支持XML对象，修复新增用户窗口；启动器保存脚本名/行号/异常类型的本机诊断。新增安装目标规划的5项回归，软件共59项通过，WPF自检与两个新增用户入口的实际点击已通过。真实下载进度与独立AppId的Inno升级/卸载已验证，见VERIFICATION.md。构建增加Defender扫描；v1.4.0告警在本机未复现，微软判定仍待取得，见SECURITY.md。发布状态以v1.4.1正式Release为准。完整鼠标点击安装链路因电脑操作中止尚未验收；不将组件验证写成完整界面验收。
 

@@ -67,6 +67,23 @@ try{
 }finally{Set-Item Function:Show-Chat $savedChat;Set-Item Function:Show-InstanceMenu $savedMenu}
 $fixture.instances[1].running=$false;Apply-Snapshot $fixture
 if($script:ui.ServiceHealth.Text -ne '有实例尚未运行'){throw 'SERVICE_STOPPED_STATE_FAILED'}
+# Formula viewing and source viewing use the real history handler, with no service calls.
+[void](Select-Instance 'primary');Show-Chat
+try{
+ $history=[pscustomobject]@{name='primary';source='conversation';messages=@([pscustomobject]@{role='assistant';at='2026-10-23T10:00:00Z';delivery='sent';attachments=@();text='行内 $x^2$，独立 \[\frac{1}{2}\]，代码 `$code$`。'})}
+ Apply-History $history
+ $entry=$script:chatWindows.primary;$chat=$entry.Window;$reader=$chat.FindName('Messages');$source=$chat.FindName('MessageSource')
+ if($reader.Document.Tag.Formulas -ne 2 -or $reader.Document.Tag.Fallbacks -or $source.Text -notlike '*$x^2$*'){throw 'CHAT_FORMULA_HISTORY_FAILED'}
+ $document=$reader.Document;Apply-History $history
+ if(-not [object]::ReferenceEquals($document,$reader.Document)){throw 'UNCHANGED_CHAT_DOCUMENT_REBUILT'}
+ $chat.FindName('ShowRaw').IsChecked=$true
+ if([string]$source.Visibility -ne 'Visible' -or [string]$reader.Visibility -ne 'Collapsed'){throw 'CHAT_SOURCE_TOGGLE_FAILED'}
+ $history.messages[0].text+=' 新公式 \(\sqrt{2}\)。';Apply-History $history
+ if(-not [object]::ReferenceEquals($document,$reader.Document) -or -not $source.Text.Contains('\sqrt{2}')){throw 'CHAT_SOURCE_REFRESH_FAILED'}
+ $chat.FindName('ShowRaw').IsChecked=$false
+ if($reader.Document.Tag.Formulas -ne 3 -or [string]$reader.Visibility -ne 'Visible' -or [string]$source.Visibility -ne 'Collapsed'){throw 'CHAT_RENDER_TOGGLE_FAILED'}
+}finally{$script:chatWindows.primary.Window.Close()}
+
 $fixture.instances=@();Apply-Snapshot $fixture
 if([string]$script:ui.OverviewEmpty.Visibility -ne 'Visible' -or $script:ui.StatInstances.Text -ne '0' -or (Selected)){throw 'EMPTY_HOME_FAILED'}
 [xml]$xmlDialog='<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="XML object regression"><TextBox Name="Label"/></Window>'

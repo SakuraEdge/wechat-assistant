@@ -77,6 +77,7 @@ $script:ui.VersionLabel.Text='v'+$script:packageVersion
 $script:ui.CurrentVersion.Text='当前运行版本 v'+$script:packageVersion+'。检测正式版本后，在本窗口下载并安装更新。'
 $iconPath=Join-Path $script:appRoot 'assets\clawbot.ico'
 if(Test-Path -LiteralPath $iconPath){$script:window.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([uri]$iconPath)}
+. (Join-Path $PSScriptRoot 'ChatMath.ps1')
 . (Join-Path $PSScriptRoot 'Dialogs.ps1')
 . (Join-Path $PSScriptRoot 'Dashboard.ps1')
 function Say([string]$text,[bool]$failed=$false){$script:ui.Message.Text=$text;$script:ui.Message.Foreground=if($failed){'#B54559'}else{'#58677E'}}

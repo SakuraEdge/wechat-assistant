@@ -1,6 +1,6 @@
 {
   "name": "wechat-assistant-manager",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "type": "module",
   "description": "ClawBot实例管理器：Windows 微信多实例、人设、模型与聊天管理",

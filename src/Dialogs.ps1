@@ -84,7 +84,7 @@ function Show-Persona {
 }
 function New-ChatDialog {
  return Read-Dialog @'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="实例聊天" Width="820" Height="740" MinWidth="600" MinHeight="500" WindowStartupLocation="CenterOwner" Background="#F8F9FC" FontFamily="Microsoft YaHei UI"><Grid Margin="22"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock Name="Heading" FontSize="22" FontWeight="SemiBold" Foreground="#242636"/><TextBlock Name="Hint" Grid.Row="1" Text="正在读取此实例的聊天记录…" Foreground="#64748B" TextWrapping="Wrap" Margin="0,10,0,14"/><TextBox Name="Messages" Grid.Row="2" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="16" FontSize="14" BorderBrush="#DFE1EC"/><WrapPanel Grid.Row="3" Margin="0,14,0,0"><Button Name="RefreshHistory" Content="刷新聊天" Padding="14,9" Margin="0,0,10,0"/><Button Name="OpenCodex" Content="在 Codex 中打开工作聊天" Padding="14,9"/><TextBlock Text="   只读查看 · 每4秒刷新" Foreground="#64748B" VerticalAlignment="Center"/></WrapPanel></Grid></Window>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Title="实例聊天" Width="820" Height="740" MinWidth="600" MinHeight="500" WindowStartupLocation="CenterOwner" Background="#F8F9FC" FontFamily="Microsoft YaHei UI"><Grid Margin="22"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions><TextBlock Name="Heading" FontSize="22" FontWeight="SemiBold" Foreground="#242636"/><TextBlock Name="Hint" Grid.Row="1" Text="正在读取此实例的聊天记录…" Foreground="#64748B" TextWrapping="Wrap" Margin="0,10,0,14"/><Grid Grid.Row="2"><RichTextBox Name="Messages" IsReadOnly="True" IsDocumentEnabled="False" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" BorderBrush="#DFE1EC" Background="White"/><TextBox Name="MessageSource" Visibility="Collapsed" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Padding="16" FontSize="14" BorderBrush="#DFE1EC"/></Grid><WrapPanel Grid.Row="3" Margin="0,14,0,0"><Button Name="RefreshHistory" Content="刷新聊天" Padding="14,9" Margin="0,0,10,0"/><Button Name="OpenCodex" Content="在 Codex 中打开工作聊天" Padding="14,9"/><Button Name="CopyHistory" Content="复制原文" Padding="12,9" Margin="10,0,0,0"/><CheckBox Name="ShowRaw" Content="查看原文" VerticalAlignment="Center" Margin="12,0,0,0"/><TextBlock Text="   只读 · 每4秒刷新" Foreground="#64748B" VerticalAlignment="Center"/></WrapPanel></Grid></Window>
 '@
 }
 $script:chatWindows=@{}
@@ -92,15 +92,19 @@ function Show-Chat {
  $row=Selected;if(-not $row){return}
  if($script:chatWindows.ContainsKey($row.name)){[void]$script:chatWindows[$row.name].Window.Activate();return}
  $dialog=New-ChatDialog;$dialog.Title='聊天 · '+$row.label+' ('+$row.name+')';$dialog.FindName('Heading').Text=$row.label+' · '+$row.persona.assistant_name;$dialog.Tag=$row.name
- $script:chatWindows[$row.name]=@{Window=$dialog;LastRefresh=[datetime]::MinValue;LastText='';AssistantName=$row.persona.assistant_name}
+ $script:chatWindows[$row.name]=@{Window=$dialog;LastRefresh=[datetime]::MinValue;LastText='';RenderedText='';Parts=@();HistoryHint='';AssistantName=$row.persona.assistant_name}
  $dialog.FindName('RefreshHistory').Add_Click({$dlg=[Windows.Window]::GetWindow($this);$script:chatWindows[$dlg.Tag].LastRefresh=[datetime]::MinValue})
  $dialog.FindName('OpenCodex').Add_Click({$dlg=[Windows.Window]::GetWindow($this);[void](Begin-JobCommand @{action='open-chat';name=$dlg.Tag})})
+ $dialog.FindName('CopyHistory').Add_Click({$dlg=[Windows.Window]::GetWindow($this);$text=$script:chatWindows[$dlg.Tag].LastText;if($text){[Windows.Clipboard]::SetText($text)}})
+ $dialog.FindName('ShowRaw').Add_Checked({$dlg=[Windows.Window]::GetWindow($this);Update-ChatView $script:chatWindows[$dlg.Tag]})
+ $dialog.FindName('ShowRaw').Add_Unchecked({$dlg=[Windows.Window]::GetWindow($this);Update-ChatView $script:chatWindows[$dlg.Tag]})
  $dialog.Add_Closed({$script:chatWindows.Remove($this.Tag)})
  $dialog.Show()
 }
 function Apply-History($value){
  if(-not $script:chatWindows.ContainsKey($value.name)){return};$entry=$script:chatWindows[$value.name];$dlg=$entry.Window
  $dlg.FindName('Hint').Text=if($value.source -eq 'legacy-summary'){'旧版近期摘要，非完整聊天历史。升级后新收发的消息会自动记录；此窗口仅查看。'}else{'微信最近最多300条收发记录；“已提交”不代表手机已读。此窗口仅查看。'}
+ $entry.HistoryHint=$dlg.FindName('Hint').Text
  $parts=@(foreach($item in @($value.messages)){
   $speaker=if($item.role -eq 'user'){'微信用户'}else{$entry.AssistantName}
   $time=if($item.at){([datetime]$item.at).ToLocalTime().ToString('MM-dd HH:mm:ss')}else{'旧版摘要'}
@@ -109,5 +113,10 @@ function Apply-History($value){
   $speaker+'  '+$time+'  · '+$delivery+"`r`n"+$item.text+$(if($attachments){"`r`n"+$attachments})
  })
  $text=if($parts.Count){$parts -join "`r`n`r`n────────────────────────`r`n`r`n"}else{'暂无聊天记录。该实例接收消息后会在这里显示。'}
- if($text -ne $entry.LastText){$box=$dlg.FindName('Messages');$atEnd=$box.VerticalOffset -ge $box.ExtentHeight-$box.ViewportHeight-25;$box.Text=$text;if($atEnd -or -not $entry.LastText){$box.ScrollToEnd()};$entry.LastText=$text}
+ if($text -ne $entry.LastText){
+  $box=$dlg.FindName('MessageSource');$atEnd=$box.VerticalOffset -ge $box.ExtentHeight-$box.ViewportHeight-25;$offset=$box.VerticalOffset
+  $box.Text=$text;if($atEnd -or -not $entry.LastText){$box.ScrollToEnd()}else{$box.ScrollToVerticalOffset($offset)}
+  $entry.LastText=$text;$entry.Parts=if($parts.Count){$parts}else{@($text)}
+ }
+ Update-ChatView $entry
 }

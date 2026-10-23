@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "project": "https://github.com/ForNeVeR/xaml-math",
+  "source_commit": "d6f576345998777dcf7ad112da1add9bd7ad9674",
+  "packages": [
+    {
+      "name": "WpfMath",
+      "version": "2.1.0",
+      "framework": "net462",
+      "url": "https://api.nuget.org/v3-flatcontainer/wpfmath/2.1.0/wpfmath.2.1.0.nupkg",
+      "sha256": "37622fa45d0dd18a312744eed4da8bf55a7b297606be87169c2bedb443eb7bad"
+    },
+    {
+      "name": "XamlMath.Shared",
+      "version": "2.1.0",
+      "framework": "net462",
+      "url": "https://api.nuget.org/v3-flatcontainer/xamlmath.shared/2.1.0/xamlmath.shared.2.1.0.nupkg",
+      "sha256": "e64a64e7a1827b8186c79a78cac50cf118a02009341e109a89c02808f5d5bc8f"
+    }
+  ],
+  "files": [
+    {
+      "path": "FONT-LICENSES.md",
+      "bytes": 5709,
+      "sha256": "32356de73439e0823f3db6d425360367aa31997ed4a5e3699e1360c87c97dcae"
+    },
+    {
+      "path": "LICENSE-XAML-Math.md",
+      "bytes": 1175,
+      "sha256": "8b6c8a2bb9fe4e17bf771c95be1a85485355319eba16473fbda9cb27ced5abb5"
+    },
+    {
+      "path": "WpfMath.dll",
+      "bytes": 145408,
+      "sha256": "28669f07ea457a0ab2de5eef360c840db8a339a142eede97132fffcf92e44b35"
+    },
+    {
+      "path": "XamlMath.Shared.dll",
+      "bytes": 296448,
+      "sha256": "d8742f4515ea0d87758205cfaeb5b922b0a486d36f6593d15b5b03200302c6e9"
+    }
+  ]
+}

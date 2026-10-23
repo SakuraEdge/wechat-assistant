@@ -8,4 +8,6 @@ for(const file of files){const relative=path.relative(root,file).replaceAll('\\'
 }
 const manifest=JSON.parse(await fs.readFile(path.join(root,'runtime-manifest.json'),'utf8'));
 for(const item of manifest.files){const resolved=path.resolve(root,item.path);if(!resolved.startsWith(root+path.sep)){errors.push('MANIFEST_PATH');continue;}try{const actual=createHash('sha256').update(await fs.readFile(resolved)).digest('hex');if(actual!==item.sha256)errors.push('HASH_MISMATCH:'+item.path);}catch{errors.push('MISSING:'+item.path);}}
+const mathRoot=path.join(root,'assets/math'),mathPins=JSON.parse(await fs.readFile(path.join(mathRoot,'dependencies.json'),'utf8'));
+for(const item of mathPins.files){if(!/^[A-Za-z0-9.-]+$/.test(item.path)){errors.push('MATH_DEPENDENCY_PATH');continue;}try{const bytes=await fs.readFile(path.join(mathRoot,item.path));if(bytes.length!==item.bytes||createHash('sha256').update(bytes).digest('hex')!==item.sha256)errors.push('MATH_DEPENDENCY_MISMATCH:'+item.path);}catch{errors.push('MATH_DEPENDENCY_MISSING:'+item.path);}}
 console.log(JSON.stringify({status:errors.length?'failed':'passed',files:files.length,manifest_files:manifest.files.length,errors},null,2));if(errors.length)process.exitCode=1;

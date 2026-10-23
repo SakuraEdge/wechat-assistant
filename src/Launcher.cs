@@ -10,8 +10,8 @@ using System.Text;
 [assembly: AssemblyTitle("ClawBot实例管理器")]
 [assembly: AssemblyDescription("ClawBot实例管理器")]
 [assembly: AssemblyProduct("ClawBot实例管理器")]
-[assembly: AssemblyVersion("1.4.1.0")]
-[assembly: AssemblyFileVersion("1.4.1.0")]
+[assembly: AssemblyVersion("1.4.2.0")]
+[assembly: AssemblyFileVersion("1.4.2.0")]
 static class Launcher {
  static string Safe(string value){return (value??"").Replace("\\","\\\\").Replace("\"","\\\"").Replace("\r","").Replace("\n","");}
  static void Diagnose(string phase,ErrorRecord error,Exception exception,bool show) {
